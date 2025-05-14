@@ -1,26 +1,42 @@
 package com.auca.library.service;
 
-import com.auca.library.dto.response.BookingResponse;
-import com.auca.library.dto.response.MessageResponse;
-import com.auca.library.exception.ResourceNotFoundException;
-import com.auca.library.model.Booking;
-import com.auca.library.model.Booking.BookingStatus;
-import com.auca.library.repository.BookingRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.auca.library.dto.response.BookingDTO;
+import com.auca.library.dto.response.BookingResponse;
+import com.auca.library.dto.response.MessageResponse;
+import com.auca.library.exception.ResourceNotFoundException;
+import com.auca.library.model.Booking;
+import com.auca.library.model.Booking.BookingStatus;
+import com.auca.library.model.WaitList;
+import com.auca.library.repository.BookingRepository;
+import com.auca.library.repository.WaitListRepository;
+
+import jakarta.mail.MessagingException;
+
 @Service
 public class AdminBookingService {
 
     @Autowired
     private BookingRepository bookingRepository;
+
+     @Autowired
+    private BookingService bookingService;
+
+    @Autowired
+    private EmailService emailService;
+    
+    @Autowired
+    private WaitListRepository waitListRepository;
 
     public List<BookingResponse> getCurrentBookings() {
         LocalDateTime now = LocalDateTime.now();
@@ -100,4 +116,111 @@ public class AdminBookingService {
         response.setCancellationReason(booking.getCancellationReason());
         return response;
     }
+
+
+
+     
+    @Scheduled(fixedRate = 60000) // Runs every minute
+    public void checkForNoShowBookings() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime cutoffTime = now.minusMinutes(2);
+        
+        // Find bookings that started more than 20 minutes ago but haven't been checked in
+        List<Booking> noShowBookings = bookingRepository.findNoShowBookings(cutoffTime, now);
+        
+        for (Booking booking : noShowBookings) {
+            // Mark as no-show and release the seat
+            markAsNoShow(booking.getId(), "Automatic cancellation due to no-show after 20 minutes");
+        }
+    }
+    
+    @Transactional
+    public BookingDTO markAsNoShow(Long id, String automatic_cancellation_due_to_noshow_afte) {
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found with id: " + id));
+        
+        // Only mark as no-show if it's still in RESERVED status
+        if (booking.getStatus() != Booking.BookingStatus.RESERVED) {
+            // Create our own BookingDTO instead of using private method
+            return createBookingDTO(booking);
+        }
+        
+        booking.setStatus(Booking.BookingStatus.NO_SHOW);
+        booking.setCancellationTime(LocalDateTime.now());
+        booking.setCancellationReason("Automatic cancellation due to no-show");
+        booking = bookingRepository.save(booking);
+        
+        // Send notification to user about no-show
+        // try {
+        //     emailService.sendNoShowNotification(
+        //         booking.getUser().getEmail(),
+        //         booking.getSeat().getSeatNumber(),
+        //         booking.getStartTime());
+        // } catch (MessagingException e) {
+        //     System.err.println("Failed to send no-show notification: " + e.getMessage());
+        // }
+        
+        // Notify waitlist users directly instead of using private method
+        notifyWaitListUsers(booking.getSeat().getId(), booking.getStartTime(), booking.getEndTime());
+        
+        return createBookingDTO(booking);
+    }
+
+
+
+     private BookingDTO createBookingDTO(Booking booking) {
+        BookingDTO dto = new BookingDTO();
+        dto.setId(booking.getId());
+        dto.setUserId(booking.getUser().getId());
+        dto.setUserName(booking.getUser().getFullName());
+        dto.setSeatId(booking.getSeat().getId());
+        dto.setSeatNumber(booking.getSeat().getSeatNumber());
+        dto.setZoneType(booking.getSeat().getZoneType());
+        dto.setStartTime(booking.getStartTime());
+        dto.setEndTime(booking.getEndTime());
+        dto.setCreatedAt(booking.getCreatedAt());
+        dto.setStatus(booking.getStatus());
+        dto.setCheckedIn(booking.isCheckedIn());
+        dto.setCheckedInTime(booking.getCheckedInTime());
+        dto.setCheckedOutTime(booking.getCheckedOutTime());
+        // Set other fields as needed...
+        return dto;
+    }
+    
+    // Create our own waitlist notification method since the original is private
+    private void notifyWaitListUsers(Long seatId, LocalDateTime startTime, LocalDateTime endTime) {
+        // Find users waiting for this seat with overlapping time
+        List<WaitList> waitingList = waitListRepository.findWaitingListForSeat(seatId);
+
+        for (WaitList waitItem : waitingList) {
+            if (isTimeOverlapping(waitItem.getRequestedStartTime(), waitItem.getRequestedEndTime(), 
+                                startTime, endTime) && !waitItem.isNotified()) {
+                
+                // Update wait list item
+                waitItem.setNotified(true);
+                waitItem.setNotifiedAt(LocalDateTime.now());
+                waitItem.setStatus(WaitList.WaitListStatus.NOTIFIED);
+                waitListRepository.save(waitItem);
+                
+                // Send notification email
+                try {
+                    emailService.sendWaitListNotification(
+                        waitItem.getUser().getEmail(),
+                        waitItem.getSeat().getSeatNumber(),
+                        waitItem.getRequestedStartTime(),
+                        waitItem.getRequestedEndTime());
+                } catch (MessagingException e) {
+                    // Log error but continue processing
+                    System.err.println("Failed to send wait list notification: " + e.getMessage());
+                }
+            }
+        }
+    }
+    
+    // Helper method to check time overlap
+    private boolean isTimeOverlapping(LocalDateTime start1, LocalDateTime end1, 
+                                LocalDateTime start2, LocalDateTime end2) {
+        return start1.isBefore(end2) && end1.isAfter(start2);
+    }
+
 }

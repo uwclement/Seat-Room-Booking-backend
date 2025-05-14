@@ -10,6 +10,9 @@ import com.auca.library.model.WaitList;
 import com.auca.library.repository.SeatRepository;
 import com.auca.library.repository.UserRepository;
 import com.auca.library.repository.WaitListRepository;
+
+import jakarta.mail.MessagingException;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -23,6 +26,15 @@ import java.util.stream.Collectors;
 
 @Service
 public class WaitListService {
+   
+   @Autowired
+   private BookingService bookingService;
+
+   @Autowired
+    private EmailService emailService;
+    
+    @Autowired
+    private NotificationService notificationService;
 
    @Autowired
    private WaitListRepository waitListRepository;
@@ -161,4 +173,46 @@ public class WaitListService {
        
        return dto;
    }
+
+
+//    private void notifyWaitListUsers(Long seatId, LocalDateTime startTime, LocalDateTime endTime) {
+//     // Find users waiting for this seat with overlapping time
+//     List<WaitList> waitingList = waitListRepository.findWaitingListForSeat(seatId);
+    
+//     for (WaitList waitItem : waitingList) {
+//         if (bookingService.isTimeOverlapping(waitItem.getRequestedStartTime(), waitItem.getRequestedEndTime(), 
+//                            startTime, endTime) && !waitItem.isNotified()) {
+            
+//             // Update wait list item
+//             waitItem.setNotified(true);
+//             waitItem.setNotifiedAt(LocalDateTime.now());
+//             waitItem.setStatus(WaitList.WaitListStatus.NOTIFIED);
+//             waitListRepository.save(waitItem);
+            
+//             Seat seat = waitItem.getSeat();
+            
+//             // Send in-app notification
+//             notificationService.sendWaitListNotification(
+//                 waitItem.getUser(),
+//                 seat,
+//                 waitItem.getRequestedStartTime(),
+//                 waitItem.getRequestedEndTime()
+//             );
+            
+//             // Send email notification
+//             try {
+//                 emailService.sendWaitListNotification(
+//                     waitItem.getUser().getEmail(),
+//                     seat.getSeatNumber(),
+//                     waitItem.getRequestedStartTime(),
+//                     waitItem.getRequestedEndTime());
+//             } catch (MessagingException e) {
+//                 // Log error but continue processing
+//                 System.err.println("Failed to send wait list notification: " + e.getMessage());
+//             }
+//         }
+//     }
+// }
+
+
 }

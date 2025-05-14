@@ -1,9 +1,15 @@
 package com.auca.library.model;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
+import com.auca.library.converter.NotificationListConverter;
+import com.auca.library.dto.request.NotificationMessage;
+
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -75,4 +81,23 @@ public class User {
         this.studentId = studentId;
         this.password = password;
     }
+
+@Column(name = "recent_notifications", columnDefinition = "jsonb")
+    @Convert(converter = NotificationListConverter.class)
+    private List<NotificationMessage> recentNotifications = new ArrayList<>();
+    
+    // Methods for backward compatibility
+    public List<NotificationMessage> getNotifications() {
+        return this.recentNotifications;
+    }
+    
+    public void setNotificationsList(List<NotificationMessage> notifications) {
+        this.recentNotifications = notifications;
+    }
+    
+    @Deprecated
+    public void saveNotifications() {
+        // No longer needed - kept for compatibility
+    }
+    
 }
