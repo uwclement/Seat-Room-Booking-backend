@@ -63,6 +63,7 @@ public class SeatService {
     public List<SeatDTO> getAvailableSeats(SeatAvailabilityRequest request) {
         List<Seat> seats;
         
+        // if (request.getIsAvailabe() )
         // Filter by zone and desktop availability if provided
         if (request.getZoneType() != null && request.getHasDesktop() != null) {
             seats = seatRepository.findByZoneTypeAndHasDesktop(request.getZoneType(), request.getHasDesktop());

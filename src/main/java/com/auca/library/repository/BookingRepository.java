@@ -1,16 +1,17 @@
 package com.auca.library.repository;
 
-import com.auca.library.model.Booking;
-import com.auca.library.model.Booking.BookingStatus;
-import com.auca.library.model.Seat;
-import com.auca.library.model.User;
+import java.time.LocalDateTime;
+import java.util.List;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
-import java.util.List;
+import com.auca.library.model.Booking;
+import com.auca.library.model.Booking.BookingStatus;
+import com.auca.library.model.Seat;
+import com.auca.library.model.User;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, Long> {
@@ -57,5 +58,24 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     
     List<Booking> findBySeatId(Long seatId);
     
+
+
+/**
+ * Find bookings that started more than 20 minutes ago and haven't been checked in
+ */
+
+@Query("SELECT b FROM Booking b WHERE b.startTime < :cutoffTime AND b.status = 'RESERVED' AND b.checkedIn = false")
+List<Booking> findNoShowBookings(@Param("cutoffTime") LocalDateTime cutoffTime, @Param("now") LocalDateTime now);
+
+/**
+ * Find bookings that started between 10 and 19 minutes ago and haven't been checked in
+ */
+@Query("SELECT b FROM Booking b WHERE b.startTime BETWEEN :maxCutoff AND :warningCutoff " +
+       "AND b.status = 'RESERVED' AND b.checkedIn = false")
+List<Booking> findBookingsNeedingWarning(
+    @Param("warningCutoff") LocalDateTime warningCutoff,
+    @Param("maxCutoff") LocalDateTime maxCutoff);
+
+
 }
 

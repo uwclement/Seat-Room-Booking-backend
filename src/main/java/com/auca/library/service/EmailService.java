@@ -126,4 +126,36 @@ public class EmailService {
         
         mailSender.send(message);
     }
+
+
+
+    /**
+ * Send a warning email when user hasn't checked in after 10 minutes
+ */
+@Async
+public void sendCheckInWarning(String to, String seatNumber, LocalDateTime startTime) 
+        throws MessagingException {
+    MimeMessage message = mailSender.createMimeMessage();
+    MimeMessageHelper helper = new MimeMessageHelper(message, true);
+    
+    helper.setTo(to);
+    helper.setSubject("URGENT: Check-in Required for Your Library Booking");
+    
+    String checkInUrl = "http://localhost:3000/my-bookings";
+    
+    String content = "<html><body>"
+            + "<h2>AUCA Library Check-in Reminder</h2>"
+            + "<p style='color: #e74c3c; font-weight: bold;'>Your booking requires immediate check-in!</p>"
+            + "<p>You have a booking for seat <strong>" + seatNumber + "</strong> starting at <strong>" 
+            + startTime.format(DATE_TIME_FORMATTER) + "</strong>.</p>"
+            + "<p>Please check in within the next 10 minutes or your booking will be automatically cancelled.</p>"
+            + "<p><a href='" + checkInUrl + "' style='background-color: #e74c3c; color: white; "
+            + "padding: 10px 15px; text-decoration: none;'>Check In Now</a></p>"
+            + "<p>If you no longer need this seat, please cancel your booking to make it available for others.</p>"
+            + "</body></html>";
+    
+    helper.setText(content, true);
+    
+    mailSender.send(message);
+}
 }

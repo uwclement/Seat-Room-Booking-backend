@@ -402,6 +402,10 @@ if (booking.getStatus() == Booking.BookingStatus.CHECKED_IN) {
     }
 }
 
+
+
+
+
 return dto;
 }
 }
