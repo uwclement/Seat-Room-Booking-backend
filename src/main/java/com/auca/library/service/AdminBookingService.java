@@ -38,6 +38,9 @@ public class AdminBookingService {
     @Autowired
     private WaitListRepository waitListRepository;
 
+    @Autowired
+    private NotificationService notificationService;
+
     public List<BookingResponse> getCurrentBookings() {
         LocalDateTime now = LocalDateTime.now();
         List<Booking> currentBookings = bookingRepository.findByEndTimeAfterAndStartTimeBeforeAndStatusIn(
@@ -77,7 +80,7 @@ public class AdminBookingService {
         
         booking.setStatus(BookingStatus.CANCELLED);
         booking.setCancellationTime(LocalDateTime.now());
-        booking.setCancellationReason("Cancelled by administrator");
+        booking.setCancellationReason("Cancelled by System");
         
         bookingRepository.save(booking);
         return new MessageResponse("Booking cancelled successfully");
@@ -123,7 +126,7 @@ public class AdminBookingService {
     @Scheduled(fixedRate = 60000) // Runs every minute
     public void checkForNoShowBookings() {
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime cutoffTime = now.minusMinutes(2);
+        LocalDateTime cutoffTime = now.minusMinutes(7);
         
         // Find bookings that started more than 20 minutes ago but haven't been checked in
         List<Booking> noShowBookings = bookingRepository.findNoShowBookings(cutoffTime, now);
@@ -135,37 +138,32 @@ public class AdminBookingService {
     }
     
     @Transactional
-    public BookingDTO markAsNoShow(Long id, String automatic_cancellation_due_to_noshow_afte) {
-        Booking booking = bookingRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Booking not found with id: " + id));
-        
-        // Only mark as no-show if it's still in RESERVED status
-        if (booking.getStatus() != Booking.BookingStatus.RESERVED) {
-            // Create our own BookingDTO instead of using private method
-            return createBookingDTO(booking);
-        }
-        
-        booking.setStatus(Booking.BookingStatus.NO_SHOW);
-        booking.setCancellationTime(LocalDateTime.now());
-        booking.setCancellationReason("Automatic cancellation due to no-show");
-        booking = bookingRepository.save(booking);
-        
-        // Send notification to user about no-show
-        // try {
-        //     emailService.sendNoShowNotification(
-        //         booking.getUser().getEmail(),
-        //         booking.getSeat().getSeatNumber(),
-        //         booking.getStartTime());
-        // } catch (MessagingException e) {
-        //     System.err.println("Failed to send no-show notification: " + e.getMessage());
-        // }
-        
-        // Notify waitlist users directly instead of using private method
-        notifyWaitListUsers(booking.getSeat().getId(), booking.getStartTime(), booking.getEndTime());
-        
+public BookingDTO markAsNoShow(Long id, String cancellationReason) {
+    Booking booking = bookingRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Booking not found with id: " + id));
+    
+    // Only mark as no-show if it's still in RESERVED status
+    if (booking.getStatus() != Booking.BookingStatus.RESERVED) {
         return createBookingDTO(booking);
     }
-
+    
+    booking.setStatus(Booking.BookingStatus.NO_SHOW);
+    booking.setCancellationTime(LocalDateTime.now());
+    booking.setCancellationReason(cancellationReason != null ? cancellationReason : "Marked as no-show by System");
+    booking = bookingRepository.save(booking);
+    
+    // Send no-show notification via NotificationService
+    notificationService.sendNoShowNotification(
+        booking.getUser(),
+        booking.getSeat().getSeatNumber(),
+        booking.getStartTime()
+    );
+    
+    // Notify waitlist users 
+    notifyWaitListUsers(booking.getSeat().getId(), booking.getStartTime(), booking.getEndTime());
+    
+    return createBookingDTO(booking);
+}
 
 
      private BookingDTO createBookingDTO(Booking booking) {
@@ -201,6 +199,14 @@ public class AdminBookingService {
                 waitItem.setNotifiedAt(LocalDateTime.now());
                 waitItem.setStatus(WaitList.WaitListStatus.NOTIFIED);
                 waitListRepository.save(waitItem);
+
+                 // Send notification via NotificationService
+                notificationService.sendWaitListNotification(
+                waitItem.getUser(),
+                waitItem.getSeat(),
+                waitItem.getRequestedStartTime(),
+                waitItem.getRequestedEndTime()
+            );
                 
                 // Send notification email
                 try {

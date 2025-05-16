@@ -40,10 +40,10 @@ public class BookingSchedulerService {
         LocalDateTime now = LocalDateTime.now();
         
         // Find bookings that started 10 minutes ago and haven't been checked in yet
-        LocalDateTime warningCutoff = now.minusMinutes(1);
+        LocalDateTime warningCutoff = now.minusMinutes(2);
         
         // Cut off at 19 minutes to avoid overlap with the no-show check
-        LocalDateTime maxCutoff = now.minusMinutes(1);
+        LocalDateTime maxCutoff = now.minusMinutes(5);
         
         List<Booking> bookingsNeedingWarning = bookingRepository.findBookingsNeedingWarning(
             warningCutoff, maxCutoff);
@@ -61,7 +61,7 @@ public class BookingSchedulerService {
     @Transactional
     public void checkForNoShowBookings() {
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime cutoffTime = now.minusMinutes(2);
+        LocalDateTime cutoffTime = now.minusMinutes(7);
         
         // Find bookings that started more than 20 minutes ago but haven't been checked in
         List<Booking> noShowBookings = bookingRepository.findNoShowBookings(cutoffTime, now);
@@ -92,6 +92,8 @@ public class BookingSchedulerService {
                 message,
                 NotificationConstants.TYPE_CHECK_IN_WARNING
             );
+             booking.setWarningSent(true); // Mark warning as sent
+             bookingRepository.save(booking);
         } catch (Exception e) {
             // Log error but continue processing
             System.err.println("Failed to send check-in warning notification: " + e.getMessage());

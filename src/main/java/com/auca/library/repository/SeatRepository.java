@@ -20,4 +20,6 @@ public interface SeatRepository extends JpaRepository<Seat, Long> {
     List<Seat> findByIsDisabled(boolean isDisabled);
     // // @Query("SELECT s FROM Seat s WHERE s."
     // List<Seat> findAvailableSeats(boolean isAvailable);
+
+    
 }

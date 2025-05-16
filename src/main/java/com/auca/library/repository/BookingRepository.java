@@ -63,18 +63,18 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 /**
  * Find bookings that started more than 20 minutes ago and haven't been checked in
  */
-
 @Query("SELECT b FROM Booking b WHERE b.startTime < :cutoffTime AND b.status = 'RESERVED' AND b.checkedIn = false")
 List<Booking> findNoShowBookings(@Param("cutoffTime") LocalDateTime cutoffTime, @Param("now") LocalDateTime now);
 
 /**
  * Find bookings that started between 10 and 19 minutes ago and haven't been checked in
  */
-@Query("SELECT b FROM Booking b WHERE b.startTime BETWEEN :maxCutoff AND :warningCutoff " +
-       "AND b.status = 'RESERVED' AND b.checkedIn = false")
-List<Booking> findBookingsNeedingWarning(
-    @Param("warningCutoff") LocalDateTime warningCutoff,
-    @Param("maxCutoff") LocalDateTime maxCutoff);
+
+@Query("SELECT b FROM Booking b WHERE " +
+       "b.checkedIn = false AND " +
+       "b.warningSent = false AND " +
+       "b.startTime BETWEEN :maxCutoff AND :warningCutoff")
+List<Booking> findBookingsNeedingWarning( @Param("warningCutoff") LocalDateTime warningCutoff, @Param("maxCutoff") LocalDateTime maxCutoff);
 
 
 }
