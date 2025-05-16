@@ -21,8 +21,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     
     Boolean existsByStudentId(String studentId);
 
-    @Query("SELECT u FROM User u WHERE u.recentNotifications IS NOT NULL AND u.recentNotifications <> ''")
-    List<User> findAllWithNotifications();
+    // @Query("SELECT u FROM User u WHERE u.recentNotifications IS NOT NULL AND u.recentNotifications <> ''")
+    // List<User> findAllWithNotifications();
 
     @Query("SELECT u FROM User u WHERE u.emailVerified = true")
     List<User> findActiveUsers();
