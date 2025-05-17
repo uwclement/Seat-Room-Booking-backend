@@ -4,6 +4,7 @@ import com.auca.library.dto.request.RecurringClosureRequest;
 import com.auca.library.dto.response.LibraryClosureExceptionResponse;
 import com.auca.library.dto.response.LibraryScheduleResponse;
 import com.auca.library.dto.response.MessageResponse;
+import com.auca.library.dto.response.LibraryStatusResponse;
 import com.auca.library.service.LibraryScheduleService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +14,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 
@@ -37,6 +39,39 @@ public class AdminLibraryScheduleController {
             @PathVariable Long id,
             @Valid @RequestBody LibraryScheduleResponse scheduleResponse) {
         return ResponseEntity.ok(libraryScheduleService.updateLibrarySchedule(id, scheduleResponse));
+    }
+
+    // Mark a day as completely closed
+    @PutMapping("/{id}/close")
+    public ResponseEntity<LibraryScheduleResponse> setDayClosed(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> requestBody) {
+        String message = requestBody.getOrDefault("message", "Library closed");
+        return ResponseEntity.ok(libraryScheduleService.setDayClosed(id, message));
+    }
+
+    // Set special closing time for a day
+    @PutMapping("/{id}/special-close")
+    public ResponseEntity<LibraryScheduleResponse> setSpecialClosingTime(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> requestBody) {
+        String timeStr = requestBody.get("specialCloseTime");
+        String message = requestBody.getOrDefault("message", "Early closing today");
+
+        LocalTime specialCloseTime = LocalTime.parse(timeStr);
+        return ResponseEntity.ok(libraryScheduleService.setSpecialClosingTime(id, specialCloseTime, message));
+    }
+
+    // Remove special closing time
+    @DeleteMapping("/{id}/special-close")
+    public ResponseEntity<LibraryScheduleResponse> removeSpecialClosingTime(@PathVariable Long id) {
+        return ResponseEntity.ok(libraryScheduleService.removeSpecialClosingTime(id));
+    }
+
+    // Get current library status
+    @GetMapping("/status")
+    public ResponseEntity<LibraryStatusResponse> getCurrentStatus() {
+        return ResponseEntity.ok(libraryScheduleService.getCurrentLibraryStatus());
     }
 
     // Get all closure exceptions
@@ -74,7 +109,7 @@ public class AdminLibraryScheduleController {
         return ResponseEntity.ok(libraryScheduleService.deleteClosureException(id));
     }
 
-    // Create recurring closures (e.g., every Sunday for the next 3 months)
+    // Create recurring closures
     @PostMapping("/exceptions/recurring")
     public ResponseEntity<List<LibraryClosureExceptionResponse>> createRecurringClosures(
             @Valid @RequestBody RecurringClosureRequest recurringClosureRequest) {
@@ -89,7 +124,7 @@ public class AdminLibraryScheduleController {
         libraryScheduleService.setScheduleMessage(message);
         return ResponseEntity.ok(new MessageResponse("Schedule message updated successfully"));
     }
-    
+
     // Get current schedule message
     @GetMapping("/message")
     public ResponseEntity<MessageResponse> getScheduleMessage() {
