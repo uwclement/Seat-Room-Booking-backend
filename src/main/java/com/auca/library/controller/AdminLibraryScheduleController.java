@@ -68,11 +68,11 @@ public class AdminLibraryScheduleController {
         return ResponseEntity.ok(libraryScheduleService.removeSpecialClosingTime(id));
     }
 
-    // Get current library status
-    @GetMapping("/status")
-    public ResponseEntity<LibraryStatusResponse> getCurrentStatus() {
-        return ResponseEntity.ok(libraryScheduleService.getCurrentLibraryStatus());
-    }
+    // // Get current library status
+    // @GetMapping("/status")
+    // public ResponseEntity<LibraryStatusResponse> getCurrentStatus() {
+    // return ResponseEntity.ok(libraryScheduleService.getCurrentLibraryStatus());
+    // }
 
     // Get all closure exceptions
     @GetMapping("/exceptions")

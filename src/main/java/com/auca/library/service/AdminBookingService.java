@@ -128,7 +128,7 @@ public class AdminBookingService {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime cutoffTime = now.minusMinutes(7);
         
-        // Find bookings that started more than 20 minutes ago but haven't been checked in
+        // Find bookings that started more than x minutes ago but haven't been checked in
         List<Booking> noShowBookings = bookingRepository.findNoShowBookings(cutoffTime, now);
         
         for (Booking booking : noShowBookings) {
