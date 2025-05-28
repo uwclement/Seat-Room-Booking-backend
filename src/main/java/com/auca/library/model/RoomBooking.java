@@ -24,7 +24,7 @@ public class RoomBooking {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    private User user; // Main booker
+    private User user; // Primary booker
 
     @Column(nullable = false)
     private LocalDateTime startTime;
@@ -37,37 +37,47 @@ public class RoomBooking {
     private BookingStatus status = BookingStatus.PENDING;
 
     @Column(nullable = false)
-    private boolean isRecurring = false;
+    private String title;
 
-    // Recurring booking reference
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "recurring_booking_id")
-    private RecurringBooking recurringBooking;
+    private String description;
 
     // Sharing and collaboration
-    @Column(nullable = false)
-    private boolean isShared = false;
-
-    @Column(nullable = false)
-    private boolean isJoinable = false; // Admin can make bookings joinable
+    @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<BookingParticipant> participants = new HashSet<>();
 
     @Column(nullable = false)
     private Integer maxParticipants;
 
+    @Column(nullable = false)
+    private boolean isPublic = false; // For joinable bookings
+
+    @Column(nullable = false)
+    private boolean allowJoining = false;
+
+    // Recurring booking
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "recurring_series_id")
+    private RecurringBookingSeries recurringBookingSeries;
+
     // Check-in tracking
     @Column(nullable = false)
-    private boolean checkedIn = false;
+    private boolean requiresCheckIn = true;
 
     private LocalDateTime checkedInAt;
 
     @Column(nullable = false)
-    private boolean checkInRequired = true;
+    private boolean autoCheckInEnabled = false;
 
-    // Approval workflow
+    // Equipment requests
+    @ManyToMany
+    @JoinTable(name = "booking_equipment_requests",
+            joinColumns = @JoinColumn(name = "booking_id"),
+            inverseJoinColumns = @JoinColumn(name = "equipment_id"))
+    private Set<Equipment> requestedEquipment = new HashSet<>();
+
+    // Admin controls
     @Column(nullable = false)
     private boolean requiresApproval = false;
-
-    private String approvalNotes;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "approved_by")
@@ -75,20 +85,7 @@ public class RoomBooking {
 
     private LocalDateTime approvedAt;
 
-    // Booking details
-    private String purpose;
-    private String notes;
-
-    // Equipment requests
-    @ManyToMany
-    @JoinTable(name = "booking_equipment",
-            joinColumns = @JoinColumn(name = "booking_id"),
-            inverseJoinColumns = @JoinColumn(name = "equipment_id"))
-    private Set<Equipment> requestedEquipment = new HashSet<>();
-
-    // Participants
-    @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private Set<BookingParticipant> participants = new HashSet<>();
+    private String rejectionReason;
 
     // Timestamps
     @Column(nullable = false, updatable = false)
@@ -96,6 +93,12 @@ public class RoomBooking {
 
     @Column(nullable = false)
     private LocalDateTime updatedAt = LocalDateTime.now();
+
+    // Notifications
+    private LocalDateTime reminderSentAt;
+
+    @Column(nullable = false)
+    private boolean reminderEnabled = true;
 
     @PreUpdate
     protected void onUpdate() {
@@ -105,17 +108,7 @@ public class RoomBooking {
     // Helper methods
     public boolean isActive() {
         return status == BookingStatus.CONFIRMED && 
-               LocalDateTime.now().isBefore(endTime) && 
-               LocalDateTime.now().isAfter(startTime);
-    }
-
-    public boolean isUpcoming() {
-        return status == BookingStatus.CONFIRMED && 
-               LocalDateTime.now().isBefore(startTime);
-    }
-
-    public boolean isPast() {
-        return LocalDateTime.now().isAfter(endTime);
+               LocalDateTime.now().isBefore(endTime);
     }
 
     public boolean canCheckIn() {
@@ -123,21 +116,28 @@ public class RoomBooking {
         return status == BookingStatus.CONFIRMED && 
                now.isAfter(startTime.minusMinutes(15)) && 
                now.isBefore(endTime) && 
-               !checkedIn;
+               checkedInAt == null;
     }
 
     public boolean isOverdue() {
-        return checkInRequired && !checkedIn && 
+        return status == BookingStatus.CONFIRMED && 
+               checkedInAt == null && 
                LocalDateTime.now().isAfter(startTime.plusMinutes(20));
     }
 
-    public int getCurrentParticipantCount() {
+    public int getCheckedInCount() {
         return (int) participants.stream()
-                .filter(p -> p.getStatus() == ParticipantStatus.ACCEPTED)
-                .count() + 1; // +1 for the main booker
+                .filter(p -> p.getCheckedInAt() != null)
+                .count() + (checkedInAt != null ? 1 : 0);
     }
 
-    public boolean hasAvailableSlots() {
-        return getCurrentParticipantCount() < maxParticipants;
+    public enum BookingStatus {
+        PENDING,        // Waiting for approval
+        CONFIRMED,      // Approved and scheduled
+        CHECKED_IN,     // User has checked in
+        COMPLETED,      // Booking finished
+        CANCELLED,      // Cancelled by user/admin
+        NO_SHOW,        // Auto-cancelled due to no check-in
+        REJECTED        // Rejected by admin
     }
 }

@@ -4,8 +4,6 @@ import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -18,38 +16,41 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "booking_participants")
+@Table(name = "room_waitlists")
 @Getter
 @Setter
 @NoArgsConstructor
-public class BookingParticipant {
+public class RoomWaitlist {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "booking_id", nullable = false)
-    private RoomBooking booking;
-
-    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private ParticipantStatus status = ParticipantStatus.INVITED;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "room_id", nullable = false)
+    private Room room;
 
-    private LocalDateTime invitedAt = LocalDateTime.now();
-    private LocalDateTime respondedAt;
-    private LocalDateTime checkedInAt;
+    @Column(nullable = false)
+    private LocalDateTime desiredStartTime;
+
+    @Column(nullable = false)
+    private LocalDateTime desiredEndTime;
+
+    @Column(nullable = false)
+    private Integer priority = 0; // Higher number = higher priority
+
+    @Column(nullable = false)
+    private boolean isActive = true;
 
     @Column(nullable = false)
     private boolean notificationSent = false;
 
-    public enum ParticipantStatus {
-        INVITED,    // Invitation sent
-        ACCEPTED,   // User accepted invitation
-        DECLINED,   // User declined invitation
-        REMOVED     // Removed by organizer
-    }
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    // Auto-expire waitlist entries after certain period
+    private LocalDateTime expiresAt;
 }
