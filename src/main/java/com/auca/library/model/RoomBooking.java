@@ -32,6 +32,8 @@ public class RoomBooking {
     @Column(nullable = false)
     private LocalDateTime endTime;
 
+    private boolean available;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private BookingStatus status = BookingStatus.PENDING;

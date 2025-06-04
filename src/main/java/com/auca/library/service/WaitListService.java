@@ -2,11 +2,18 @@ package com.auca.library.service;
 
 import com.auca.library.dto.request.WaitListRequest;
 import com.auca.library.dto.response.WaitListDTO;
+import com.auca.library.dto.response.WaitlistResponse;
 import com.auca.library.exception.BadRequestException;
 import com.auca.library.exception.ResourceNotFoundException;
+import com.auca.library.model.Room;
+import com.auca.library.model.RoomBooking;
+import com.auca.library.model.RoomWaitlist;
 import com.auca.library.model.Seat;
 import com.auca.library.model.User;
 import com.auca.library.model.WaitList;
+import com.auca.library.repository.RoomBookingRepository;
+import com.auca.library.repository.RoomRepository;
+import com.auca.library.repository.RoomWaitlistRepository;
 import com.auca.library.repository.SeatRepository;
 import com.auca.library.repository.UserRepository;
 import com.auca.library.repository.WaitListRepository;
@@ -14,6 +21,7 @@ import com.auca.library.repository.WaitListRepository;
 import jakarta.mail.MessagingException;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -27,27 +35,26 @@ import java.util.stream.Collectors;
 @Service
 public class WaitListService {
    
-   @Autowired
-   private BookingService bookingService;
+   @Autowired private BookingService bookingService;
 
-   @Autowired
-    private EmailService emailService;
+   @Autowired private EmailService emailService;
     
-    @Autowired
-    private NotificationService notificationService;
+   @Autowired private NotificationService notificationService;
 
-   @Autowired
-   private WaitListRepository waitListRepository;
+   @Autowired private WaitListRepository waitListRepository;
    
-   @Autowired
-   private SeatRepository seatRepository;
+   @Autowired private SeatRepository seatRepository;
    
-   @Autowired
-   private UserRepository userRepository;
+   @Autowired private UserRepository userRepository;
    
-   @Autowired
-   private SeatService seatService;
+   @Autowired private SeatService seatService;
    
+   @Autowired private RoomWaitlistRepository waitlistRepository;
+
+   @Autowired private RoomBookingRepository roomBookingRepository;
+
+   @Autowired private RoomRepository roomRepository;
+
    @Transactional
    public WaitListDTO joinWaitList(WaitListRequest request) {
        // Get current user
@@ -213,6 +220,157 @@ public class WaitListService {
 //         }
 //     }
 // }
+
+ @Transactional
+    public WaitlistResponse addToWaitlist(String userEmail, Long roomId, 
+                                         LocalDateTime desiredStartTime, LocalDateTime desiredEndTime) {
+        User user = findUserByEmail(userEmail);
+        Room room = findRoomById(roomId);
+        
+        // Check if user already on waitlist for this time slot
+        List<RoomWaitlist> existingWaitlist = waitlistRepository.findWaitlistForTimeSlot(
+            room, desiredStartTime, desiredEndTime);
+        
+        boolean userAlreadyWaiting = existingWaitlist.stream()
+            .anyMatch(w -> w.getUser().equals(user) && w.isActive());
+        
+        if (userAlreadyWaiting) {
+            throw new IllegalStateException("User is already on waitlist for this time slot");
+        }
+        
+        RoomWaitlist waitlistEntry = new RoomWaitlist();
+        waitlistEntry.setUser(user);
+        waitlistEntry.setRoom(room);
+        waitlistEntry.setDesiredStartTime(desiredStartTime);
+        waitlistEntry.setDesiredEndTime(desiredEndTime);
+        waitlistEntry.setPriority(calculatePriority(user, room));
+        waitlistEntry.setExpiresAt(desiredStartTime.minusHours(1)); // Expire 1 hour before desired time
+        
+        waitlistEntry = waitlistRepository.save(waitlistEntry);
+        
+        WaitlistResponse response = mapToResponse(waitlistEntry);
+        response.setPositionInQueue(getPositionInQueue(waitlistEntry));
+        
+        return response;
+    }
+    
+    @Transactional
+    public void processWaitlistForAvailableSlot(Room room, LocalDateTime startTime, LocalDateTime endTime) {
+        List<RoomWaitlist> waitingUsers = waitlistRepository.findWaitlistForTimeSlot(room, startTime, endTime);
+        
+        for (RoomWaitlist waitlistEntry : waitingUsers) {
+            if (waitlistEntry.isActive() && !waitlistEntry.isNotificationSent()) {
+                // Notify user about availability
+                notificationService.addNotification(
+                    waitlistEntry.getUser().getEmail(),
+                    "Room Available from Waitlist",
+                    String.format("The room %s is now available for your requested time: %s - %s. You have 15 minutes to book it.",
+                        room.getName(), startTime, endTime),
+                    "WAITLIST_AVAILABLE"
+                );
+                
+                waitlistEntry.setNotificationSent(true);
+                waitlistRepository.save(waitlistEntry);
+                
+                // Only notify the first user (highest priority)
+                break;
+            }
+        }
+    }
+    
+    @Transactional
+    public void removeFromWaitlist(Long waitlistId, String userEmail) {
+        RoomWaitlist waitlistEntry = waitlistRepository.findById(waitlistId)
+            .orElseThrow(() -> new ResourceNotFoundException("Waitlist entry not found"));
+        
+        if (!waitlistEntry.getUser().getEmail().equals(userEmail)) {
+            throw new SecurityException("User cannot remove this waitlist entry");
+        }
+        
+        waitlistEntry.setActive(false);
+        waitlistRepository.save(waitlistEntry);
+    }
+    
+    public List<WaitlistResponse> getUserWaitlist(String userEmail) {
+        User user = findUserByEmail(userEmail);
+        List<RoomWaitlist> waitlistEntries = waitlistRepository.findByUserAndIsActiveTrueOrderByCreatedAtDesc(user);
+        
+        return waitlistEntries.stream()
+            .map(entry -> {
+                WaitlistResponse response = mapToResponse(entry);
+                response.setPositionInQueue(getPositionInQueue(entry));
+                response.setEstimatedAvailabilityTime(estimateAvailabilityTime(entry));
+                return response;
+            })
+            .collect(Collectors.toList());
+    }
+    
+    @Scheduled(fixedRate = 300000) // Every 5 minutes
+    @Transactional
+    public void cleanupExpiredWaitlistEntries() {
+        LocalDateTime now = LocalDateTime.now();
+        List<RoomWaitlist> expiredEntries = waitlistRepository.findExpiredWaitlistEntries(now);
+        
+        for (RoomWaitlist entry : expiredEntries) {
+            entry.setActive(false);
+            waitlistRepository.save(entry);
+        }
+    }
+    
+    private Integer calculatePriority(User user, Room room) {
+        // Higher priority for users with booking history in this room
+        List<RoomBooking> userBookingHistory = roomBookingRepository.findUserBookingHistory(user);
+        long roomBookings = userBookingHistory.stream()
+            .filter(booking -> booking.getRoom().equals(room))
+            .count();
+        
+        return (int) Math.min(10, roomBookings); // Max priority of 10
+    }
+    
+    private Integer getPositionInQueue(RoomWaitlist waitlistEntry) {
+        List<RoomWaitlist> queuedUsers = waitlistRepository.findWaitlistForTimeSlot(
+            waitlistEntry.getRoom(), 
+            waitlistEntry.getDesiredStartTime(), 
+            waitlistEntry.getDesiredEndTime()
+        );
+        
+        return queuedUsers.indexOf(waitlistEntry) + 1;
+    }
+    
+    private LocalDateTime estimateAvailabilityTime(RoomWaitlist waitlistEntry) {
+        // Simple estimation based on current bookings
+        List<RoomBooking> activeBookings = roomBookingRepository.findActiveBookingsForRoom(
+            waitlistEntry.getRoom(), 
+            LocalDateTime.now(), 
+            waitlistEntry.getDesiredEndTime()
+        );
+        
+        if (activeBookings.isEmpty()) {
+            return LocalDateTime.now();
+        }
+        
+        return activeBookings.stream()
+            .map(RoomBooking::getEndTime)
+            .min(LocalDateTime::compareTo)
+            .orElse(waitlistEntry.getDesiredStartTime());
+    }
+    
+    private WaitlistResponse mapToResponse(RoomWaitlist waitlistEntry) {
+        WaitlistResponse response = new WaitlistResponse();
+        response.setId(waitlistEntry.getId());
+        // Map other fields...
+        return response;
+    }
+    
+    private User findUserByEmail(String email) {
+        return userRepository.findByEmail(email)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
+    }
+    
+    private Room findRoomById(Long roomId) {
+        return roomRepository.findById(roomId)
+            .orElseThrow(() -> new ResourceNotFoundException("Room not found: " + roomId));
+    }
 
 
 }
