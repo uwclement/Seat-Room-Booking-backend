@@ -1,19 +1,31 @@
 package com.auca.library.service;
 
-import com.auca.library.dto.request.*;
-import com.auca.library.dto.response.*;
-import com.auca.library.exception.ResourceNotFoundException;
-import com.auca.library.model.*;
-import com.auca.library.repository.*;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.auca.library.dto.request.BulkRoomOperationRequest;
+import com.auca.library.dto.request.RoomCreateRequest;
+import com.auca.library.dto.request.RoomTemplateRequest;
+import com.auca.library.dto.request.RoomUpdateRequest;
+import com.auca.library.dto.response.EquipmentResponse;
+import com.auca.library.dto.response.MessageResponse;
+import com.auca.library.dto.response.RoomResponse;
+import com.auca.library.dto.response.RoomTemplateResponse;
+import com.auca.library.exception.ResourceNotFoundException;
+import com.auca.library.model.Equipment;
+import com.auca.library.model.Room;
+import com.auca.library.model.RoomCategory;
+import com.auca.library.model.RoomTemplate;
+import com.auca.library.repository.EquipmentRepository;
+import com.auca.library.repository.RoomRepository;
+import com.auca.library.repository.RoomTemplateRepository;
 
 @Service
 public class AdminRoomService {

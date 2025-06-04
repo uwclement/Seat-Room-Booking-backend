@@ -35,4 +35,6 @@ public interface EquipmentRepository extends JpaRepository<Equipment, Long> {
     // Statistics
     @Query("SELECT COUNT(e) FROM Equipment e WHERE e.available = true")
     Long countAvailableEquipment();
+
+    List<Equipment> findByAvailable(boolean available);
 }

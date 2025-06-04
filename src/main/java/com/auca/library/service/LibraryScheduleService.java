@@ -32,9 +32,6 @@ public class LibraryScheduleService {
     @Autowired
     private LibraryClosureExceptionRepository exceptionRepository;
 
-    @Autowired
-    private NotificationService notificationService;
-
     private String scheduleMessage;
 
     public List<LibraryScheduleResponse> getAllLibrarySchedules() {
@@ -423,5 +420,50 @@ public class LibraryScheduleService {
 
         return response;
     }
+
+
+
+    /**
+ * Check if library is open on a specific date
+ */
+public boolean isLibraryOpen(LocalDate date) {
+    // Check for closure exceptions first
+    LibraryClosureException exception = exceptionRepository.findByDate(date).orElse(null);
+    if (exception != null) {
+        return !exception.isClosedAllDay();
+    }
+
+    // Check regular schedule
+    LibrarySchedule schedule = scheduleRepository.findByDayOfWeek(date.getDayOfWeek()).orElse(null);
+    return schedule != null && schedule.isOpen();
+}
+
+/**
+ * Get library operating hours for a specific date as a formatted string
+ */
+public String getLibraryHours(LocalDate date) {
+    // Check for closure exceptions first
+    LibraryClosureException exception = exceptionRepository.findByDate(date).orElse(null);
+    if (exception != null) {
+        if (exception.isClosedAllDay()) {
+            return "Closed";
+        } else if (exception.getOpenTime() != null && exception.getCloseTime() != null) {
+            return exception.getOpenTime().format(DateTimeFormatter.ofPattern("HH:mm")) + 
+                   " - " + 
+                   exception.getCloseTime().format(DateTimeFormatter.ofPattern("HH:mm"));
+        }
+    }
+
+    // Check regular schedule
+    LibrarySchedule schedule = scheduleRepository.findByDayOfWeek(date.getDayOfWeek()).orElse(null);
+    if (schedule == null || !schedule.isOpen()) {
+        return "Closed";
+    }
+
+    LocalTime effectiveCloseTime = schedule.getEffectiveCloseTime();
+    return schedule.getOpenTime().format(DateTimeFormatter.ofPattern("HH:mm")) + 
+           " - " + 
+           effectiveCloseTime.format(DateTimeFormatter.ofPattern("HH:mm"));
+}
 
 }

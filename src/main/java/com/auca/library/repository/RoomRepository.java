@@ -103,4 +103,55 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
     
     @Query("SELECT r FROM Room r ORDER BY r.createdAt DESC")
     List<Room> findAllOrderByCreatedAtDesc();
+
+
+     // Booking-related queries
+    @Query("SELECT r FROM Room r WHERE r.available = :available AND " +
+           "((:available = true AND (r.category = 'LIBRARY_ROOM' OR r.category = 'STUDY_ROOM')) OR " +
+           "(:available = false))")
+    List<Room> findByAvailableAndRequiresBooking(@Param("available") boolean available, @Param("requiresBooking") boolean requiresBooking);
+    
+    // Alternative simpler version if you prefer
+    @Query("SELECT r FROM Room r WHERE r.available = :available AND " +
+           "(r.category = 'LIBRARY_ROOM' OR r.category = 'STUDY_ROOM')")
+    List<Room> findAvailableBookableRooms(@Param("available") boolean available);
+    
+    // Category and booking queries
+    @Query("SELECT r FROM Room r WHERE r.available = :available AND r.category = :category AND " +
+           "(r.category = 'LIBRARY_ROOM' OR r.category = 'STUDY_ROOM')")
+    List<Room> findByAvailableAndCategoryAndRequiresBooking(
+            @Param("available") boolean available, 
+            @Param("category") RoomCategory category, 
+            @Param("requiresBooking") boolean requiresBooking);
+    
+    // Building and floor queries
+    @Query("SELECT DISTINCT r.building FROM Room r WHERE r.available = true AND " +
+           "(r.category = 'LIBRARY_ROOM' OR r.category = 'STUDY_ROOM') AND r.building IS NOT NULL")
+    List<String> findDistinctBuildings();
+    
+    @Query("SELECT DISTINCT r.floor FROM Room r WHERE r.building = :building AND r.available = true AND " +
+           "(r.category = 'LIBRARY_ROOM' OR r.category = 'STUDY_ROOM') AND r.floor IS NOT NULL")
+    List<String> findDistinctFloorsByBuilding(@Param("building") String building);
+    
+    // Additional useful queries for booking system
+    @Query("SELECT r FROM Room r WHERE r.available = true AND r.maintenanceStart IS NULL OR " +
+           "(r.maintenanceStart IS NOT NULL AND r.maintenanceEnd IS NOT NULL AND " +
+           "NOT (:now BETWEEN r.maintenanceStart AND r.maintenanceEnd))")
+    List<Room> findAvailableRoomsForBooking(@Param("now") LocalDateTime now);
+    
+    @Query("SELECT r FROM Room r WHERE r.available = true AND " +
+           "(r.category = 'LIBRARY_ROOM' OR r.category = 'STUDY_ROOM') AND " +
+           "(r.maintenanceStart IS NULL OR r.maintenanceEnd IS NULL OR " +
+           "NOT (:now BETWEEN r.maintenanceStart AND r.maintenanceEnd))")
+    List<Room> findAvailableBookableRoomsNotUnderMaintenance(@Param("now") LocalDateTime now);
+    
+    // Room search with booking capability
+    @Query("SELECT r FROM Room r WHERE r.available = true AND " +
+           "(r.category = 'LIBRARY_ROOM' OR r.category = 'STUDY_ROOM') AND " +
+           "(LOWER(r.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(r.roomNumber) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(r.description) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+    List<Room> searchBookableRooms(@Param("keyword") String keyword);
+
+    List<Room> findByBuildingAndAvailable(String building, boolean available);
 }
