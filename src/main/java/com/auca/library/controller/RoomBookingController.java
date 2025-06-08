@@ -29,6 +29,8 @@ import com.auca.library.dto.request.InviteParticipantsRequest;
 import com.auca.library.dto.request.JoinBookingRequest;
 import com.auca.library.dto.request.RoomBookingRequest;
 import com.auca.library.dto.response.BookingHistoryResponse;
+import com.auca.library.dto.response.BookingParticipantResponse;
+import com.auca.library.dto.response.InvitationResponse;
 import com.auca.library.dto.response.MessageResponse;
 import com.auca.library.dto.response.RecurringBookingSeriesResponse;
 import com.auca.library.dto.response.RoomAvailabilityResponse;
@@ -60,14 +62,21 @@ public class RoomBookingController {
     @Autowired
     private AdminRoomService adminRoomService;
 
-    // ========== BOOKING CRUD OPERATIONS ==========
-
-    @GetMapping
+    // retrieve rooms 
+    @GetMapping("/rooms")
     public ResponseEntity<List<RoomResponse>> getAllRooms() {
         List<RoomResponse> rooms = adminRoomService.getAllRooms();
         return ResponseEntity.ok(rooms);
     }
 
+    // Get single room by ID
+    @GetMapping("/rooms/{roomId}")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    public ResponseEntity<RoomResponse> getRoomById( @Parameter(description = "Room ID") @PathVariable Long roomId) {  
+    RoomResponse response = adminRoomService.getRoomById(roomId);
+    return ResponseEntity.ok(response);
+}
+    // ========== BOOKING CRUD OPERATIONS ==========
     @PostMapping
     @Operation(summary = "Create a new room booking", description = "Create a new room booking with optional participants and recurring settings")
     @ApiResponses(value = {
@@ -116,6 +125,18 @@ public class RoomBookingController {
         MessageResponse response = roomBookingService.cancelBooking(bookingId, userEmail);
         return ResponseEntity.ok(response);
     }
+
+
+@GetMapping("/my-invitations")
+@Operation(summary = "Get user's pending invitations", description = "Get all pending room booking invitations for the current user")
+@PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+public ResponseEntity<List<InvitationResponse>> getMyPendingInvitations(
+        Authentication authentication) {
+    
+    String userEmail = authentication.getName();
+    List<InvitationResponse> invitations = roomBookingService.getUserPendingInvitations(userEmail);
+    return ResponseEntity.ok(invitations);
+}
 
     @GetMapping("/{bookingId}")
     @Operation(summary = "Get booking details", description = "Get detailed information about a specific booking")
