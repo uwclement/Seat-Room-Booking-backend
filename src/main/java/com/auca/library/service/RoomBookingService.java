@@ -387,6 +387,29 @@ public class RoomBookingService {
         });
     }
     
+
+    // In RoomBookingService
+public List<InvitationResponse> getUserPendingInvitations(String userEmail) {
+    User user = findUserByEmail(userEmail);
+    
+    List<BookingParticipant> pendingInvitations = participantRepository.findByUserAndStatusIn(
+        user, List.of(BookingParticipant.ParticipantStatus.INVITED)
+    );
+    
+    return pendingInvitations.stream()
+            .map(this::mapToInvitationResponse)
+            .collect(Collectors.toList());
+}
+
+private InvitationResponse mapToInvitationResponse(BookingParticipant participant) {
+    InvitationResponse response = new InvitationResponse();
+    response.setParticipantId(participant.getId());
+    response.setBooking(mapToResponse(participant.getBooking()));
+    response.setInvitedAt(participant.getInvitedAt());
+    response.setInviterName(participant.getBooking().getUser().getFullName());
+    return response;
+}
+
     private void processWaitlistForCancellation(RoomBooking booking) {
         // This will be implemented in WaitlistService
         // waitlistService.processWaitlistForAvailableSlot(booking.getRoom(), booking.getStartTime(), booking.getEndTime());
