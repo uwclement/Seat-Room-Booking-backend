@@ -17,4 +17,9 @@ public class BookingParticipantResponse {
     public enum ParticipantStatus {
         INVITED, ACCEPTED, DECLINED, REMOVED
     }
+
+    public void setBooking(RoomBookingResponse mapToResponse) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'setBooking'");
+    }
 }
