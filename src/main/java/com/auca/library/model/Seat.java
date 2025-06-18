@@ -1,12 +1,21 @@
 package com.auca.library.model;
 
-import jakarta.persistence.*;
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
-import java.util.HashSet;
-import java.util.Set;
 
 @Entity
 @Table(name = "seats")
@@ -32,6 +41,22 @@ public class Seat {
     private boolean isDisabled = false;
 
     private String description;
+    
+     // QR CODE fields
+    @Column(name = "qr_code_url")
+    private String qrCodeUrl;
+
+    @Column(name = "qr_code_token", unique = true)
+    private String qrCodeToken;
+
+    @Column(name = "qr_image_path", length = 500)
+    private String qrImagePath;
+
+    @Column(name = "qr_generated_at")
+    private LocalDateTime qrGeneratedAt;
+
+    @Column(name = "qr_version", nullable = false)
+    private Integer qrVersion = 1;
 
     @OneToMany(mappedBy = "seat", cascade = CascadeType.ALL)
     private Set<Booking> bookings = new HashSet<>();

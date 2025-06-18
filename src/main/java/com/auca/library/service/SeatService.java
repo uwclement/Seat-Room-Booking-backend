@@ -5,9 +5,11 @@ import com.auca.library.dto.request.SeatAvailabilityRequest;
 import com.auca.library.dto.response.SeatDTO;
 import com.auca.library.exception.ResourceNotFoundException;
 import com.auca.library.model.Booking;
+import com.auca.library.model.QRCodeLog;
 import com.auca.library.model.Seat;
 import com.auca.library.model.User;
 import com.auca.library.repository.BookingRepository;
+import com.auca.library.repository.QRCodeLogRepository;
 import com.auca.library.repository.SeatRepository;
 import com.auca.library.repository.UserRepository;
 import com.auca.library.repository.WaitListRepository;
@@ -39,6 +41,17 @@ public class SeatService {
     
     @Autowired
     private WaitListRepository waitListRepository;
+
+    @Autowired
+    private QRCodeGenerationService qrGenerationService;
+
+    @Autowired
+    private QRCodeStorageService qrStorageService;
+
+    @Autowired
+    private QRCodeLogRepository qrCodeLogRepository;
+
+    
     
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
     
@@ -203,6 +216,30 @@ public class SeatService {
         seat.setDisabled(false);
         
         seat = seatRepository.save(seat);
+
+        try {
+        String token = qrGenerationService.generateUniqueToken();
+        String qrUrl = qrGenerationService.generateSeatQRUrl(token);
+        byte[] qrImage = qrGenerationService.generateQRCodeImage(qrUrl, seat.getSeatNumber());
+        String filename = qrGenerationService.generateAndSaveQRCode(qrUrl, "SEAT", seat.getSeatNumber());
+        String imagePath = qrStorageService.storeQRCode(qrImage, filename, "seat");
+        
+        seat.setQrCodeToken(token);
+        seat.setQrCodeUrl(qrUrl);
+        seat.setQrImagePath(imagePath);
+        seat.setQrGeneratedAt(LocalDateTime.now());
+        seat = seatRepository.save(seat);
+        
+        // Log QR generation
+        // QRCodeLog log = new QRCodeLog("SEAT", seat.getId(), getCurrentAdmin(), token);
+        // log.setGenerationReason("Auto-generated on creation");
+        // qrCodeLogRepository.save(log);
+        
+    } catch (Exception e) {
+        // Log error but don't fail seat creation
+        System.err.println("Failed to generate QR code for new seat: " + e.getMessage());
+    }
+
         LocalDateTime now = LocalDateTime.now();
         
         return mapSeatToDTO(seat, now, now.plusHours(1));

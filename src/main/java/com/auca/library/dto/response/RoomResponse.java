@@ -41,4 +41,10 @@ public class RoomResponse {
     // Timestamps
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+
+    private String qrCodeUrl;
+    private String qrImageUrl;
+    private boolean hasQRCode;
+    private LocalDateTime qrGeneratedAt;
 }

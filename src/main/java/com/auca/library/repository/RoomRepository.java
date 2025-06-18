@@ -154,4 +154,13 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
     List<Room> searchBookableRooms(@Param("keyword") String keyword);
 
     List<Room> findByBuildingAndAvailable(String building, boolean available);
+
+
+     // QR Code methods
+    Optional<Room> findByQrCodeToken(String qrCodeToken);
+    boolean existsByQrCodeToken(String qrCodeToken);
+    List<Room> findByQrCodeTokenIsNull();
+    
+    @Query("SELECT r FROM Room r WHERE r.qrImagePath IS NULL AND r.available = true")
+    List<Room> findRoomsWithoutQRCode();
 }

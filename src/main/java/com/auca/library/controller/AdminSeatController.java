@@ -1,17 +1,28 @@
 package com.auca.library.controller;
 
 import com.auca.library.dto.request.BulkSeatUpdateRequest;
+import com.auca.library.dto.request.QRBulkGenerationRequest;
+import com.auca.library.dto.response.BulkQRGenerationResponse;
 import com.auca.library.dto.response.MessageResponse;
+import com.auca.library.dto.response.QRCodeGenerationResponse;
 import com.auca.library.dto.response.SeatDTO;
+import com.auca.library.service.AdminQRCodeService;
 import com.auca.library.service.SeatService;
+import org.springframework.security.core.Authentication;
+
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
+import java.util.Map;
+import java.util.Date;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
@@ -21,6 +32,9 @@ public class AdminSeatController {
 
     @Autowired
     private SeatService seatService;
+
+     @Autowired
+    private AdminQRCodeService adminQRCodeService;
 
     // Get all seats (admin view)
     @GetMapping
@@ -79,4 +93,44 @@ public class AdminSeatController {
     public ResponseEntity<List<SeatDTO>> getDisabledSeats() {
         return ResponseEntity.ok(seatService.getDisabledSeats());
     }
+
+@PostMapping("/{id}/generate-qr")
+@Operation(summary = "Generate QR code for seat", description = "Generate or regenerate QR code for a specific seat")
+public ResponseEntity<QRCodeGenerationResponse> generateSeatQR(@PathVariable Long id, 
+       Authentication authentication) {
+
+    try {
+        String adminEmail = authentication.getName();
+        QRCodeGenerationResponse response = adminQRCodeService.generateSeatQRCode(id, adminEmail);
+        return ResponseEntity.ok(response);
+    } catch (Exception e) {
+        // Create proper QRCodeGenerationResponse for error case
+        QRCodeGenerationResponse errorResponse = new QRCodeGenerationResponse();
+        errorResponse.setSuccess(false);
+        errorResponse.setErrorMessage("Failed to generate QR code: " + e.getMessage());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+    }
+}
+
+// Fixed helper method - change return type to match usage
+private QRCodeGenerationResponse createQRErrorResponse(String message) {
+    QRCodeGenerationResponse errorResponse = new QRCodeGenerationResponse();
+    errorResponse.setSuccess(false);
+    errorResponse.setErrorMessage(message);
+    // errorResponse.setTimestamp(new Date().toString());
+    return errorResponse;
+}
+
+      @PostMapping("/bulk-generate-qr")
+      @Operation(summary = "Bulk generate QR codes for seats", description = "Generate QR codes for multiple seats")
+       public ResponseEntity<BulkQRGenerationResponse> bulkGenerateSeatQRs( @Valid @RequestBody QRBulkGenerationRequest request,
+        Authentication authentication) {
+    
+    String adminEmail = authentication.getName();
+    BulkQRGenerationResponse response = adminQRCodeService.bulkGenerateSeatQRCodes(request, adminEmail);
+    return ResponseEntity.ok(response);
+}
+
+
+
 }

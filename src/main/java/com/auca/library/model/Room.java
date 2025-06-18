@@ -51,6 +51,24 @@ public class Room {
     private String floor;
     private String department;
 
+
+     //QR CODE fields
+    @Column(name = "qr_code_url")
+    private String qrCodeUrl;
+
+    @Column(name = "qr_code_token", unique = true)
+    private String qrCodeToken;
+
+    @Column(name = "qr_image_path", length = 500)
+    private String qrImagePath;
+
+    @Column(name = "qr_generated_at")
+    private LocalDateTime qrGeneratedAt;
+
+    @Column(name = "qr_version", nullable = false)
+    private Integer qrVersion = 1;
+    // ====================================
+
     // Equipment relationships
     @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     @JoinTable(name = "room_equipment",
