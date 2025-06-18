@@ -3,16 +3,24 @@ package com.auca.library.controller;
 import com.auca.library.dto.request.*;
 import com.auca.library.dto.response.*;
 import com.auca.library.model.RoomCategory;
+import com.auca.library.service.AdminQRCodeService;
 import com.auca.library.service.AdminRoomService;
+import org.springframework.security.core.Authentication;
+
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
+import java.util.Map;
+import java.util.Date;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
@@ -22,6 +30,9 @@ public class AdminRoomController {
 
     @Autowired
     private AdminRoomService adminRoomService;
+
+    @Autowired
+    private AdminQRCodeService adminQRCodeService;
 
     // === Room CRUD Operations ===
 
@@ -181,4 +192,47 @@ public class AdminRoomController {
         List<RoomResponse> rooms = adminRoomService.getRecentlyUpdatedRooms(hours);
         return ResponseEntity.ok(rooms);
     }
+
+
+@PostMapping("/{id}/generate-qr")
+@Operation(summary = "Generate QR code for room", description = "Generate or regenerate QR code for a specific room")
+public ResponseEntity<QRCodeGenerationResponse> generateRoomQR(@PathVariable Long id, 
+     Authentication authentication) {  
+    try {
+        String adminEmail = authentication.getName();
+        QRCodeGenerationResponse response = adminQRCodeService.generateRoomQRCode(id, adminEmail);
+        return ResponseEntity.ok(response);
+    } catch (Exception e) {
+        // Create proper QRCodeGenerationResponse for error case
+        QRCodeGenerationResponse errorResponse = new QRCodeGenerationResponse();
+        errorResponse.setSuccess(false);
+        errorResponse.setErrorMessage("Failed to generate QR code: " + e.getMessage());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+    }
+}
+
+// Fixed helper method - change return type to match usage
+private QRCodeGenerationResponse createQRErrorResponse(String message) {
+    QRCodeGenerationResponse errorResponse = new QRCodeGenerationResponse();
+    errorResponse.setSuccess(false);
+    errorResponse.setErrorMessage(message);
+    // errorResponse.setTimestamp(new Date().toString());
+    return errorResponse;
+}
+
+
+
+    @PostMapping("/bulk-generate-qr")
+    @Operation(summary = "Bulk generate QR codes for rooms", description = "Generate QR codes for multiple rooms")
+    
+    public ResponseEntity<BulkQRGenerationResponse> bulkGenerateRoomQRs( @Valid @RequestBody QRBulkGenerationRequest request, 
+         Authentication authentication) {
+
+    String adminEmail = authentication.getName();
+    BulkQRGenerationResponse response = adminQRCodeService.bulkGenerateRoomQRCodes(request, adminEmail);
+    return ResponseEntity.ok(response);
+}
+
+
+
 }

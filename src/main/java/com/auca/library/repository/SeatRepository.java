@@ -1,6 +1,7 @@
 package com.auca.library.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -18,8 +19,14 @@ public interface SeatRepository extends JpaRepository<Seat, Long> {
     List<Seat> findByZoneTypeAndHasDesktop(String zoneType, boolean hasDesktop);
     
     List<Seat> findByIsDisabled(boolean isDisabled);
-    // // @Query("SELECT s FROM Seat s WHERE s."
-    // List<Seat> findAvailableSeats(boolean isAvailable);
+    
 
+    // QR Code methods
+    Optional<Seat> findByQrCodeToken(String qrCodeToken);
+    boolean existsByQrCodeToken(String qrCodeToken);
+    List<Seat> findByQrCodeTokenIsNull();
+    
+    @Query("SELECT s FROM Seat s WHERE s.qrImagePath IS NULL AND s.isDisabled = false")
+    List<Seat> findSeatsWithoutQRCode();
     
 }

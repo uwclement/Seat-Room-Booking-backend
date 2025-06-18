@@ -360,7 +360,7 @@ public class BookingService {
             throw new BadRequestException("Booking duration cannot exceed " + MAX_BOOKING_HOURS + " hours");
         }
 
-        // NEW: Validate against library schedule and closures
+        // Validate against library schedule and closures
         validateAgainstLibrarySchedule(bookingDate, bookingStartTime, bookingEndTime);
 
         // Check if booking is within the current week (or next week from Sunday)
@@ -387,7 +387,7 @@ public class BookingService {
         }
     }
 
-    // NEW: Validate booking against library schedule
+    // Validate booking against library schedule
     private void validateAgainstLibrarySchedule(LocalDate date, LocalTime startTime, LocalTime endTime) {
         // Check if library is open during the booking period
         if (!libraryScheduleService.isLibraryOpenAt(date, startTime)) {

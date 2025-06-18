@@ -20,10 +20,12 @@ import com.auca.library.dto.response.RoomResponse;
 import com.auca.library.dto.response.RoomTemplateResponse;
 import com.auca.library.exception.ResourceNotFoundException;
 import com.auca.library.model.Equipment;
+import com.auca.library.model.QRCodeLog;
 import com.auca.library.model.Room;
 import com.auca.library.model.RoomCategory;
 import com.auca.library.model.RoomTemplate;
 import com.auca.library.repository.EquipmentRepository;
+import com.auca.library.repository.QRCodeLogRepository;
 import com.auca.library.repository.RoomRepository;
 import com.auca.library.repository.RoomTemplateRepository;
 
@@ -38,6 +40,15 @@ public class AdminRoomService {
 
     @Autowired
     private RoomTemplateRepository roomTemplateRepository;
+
+     @Autowired
+    private QRCodeGenerationService qrGenerationService;
+
+    @Autowired
+    private QRCodeStorageService qrStorageService;
+
+    @Autowired
+    private QRCodeLogRepository qrCodeLogRepository;
 
     // === Room CRUD Operations ===
 
@@ -94,6 +105,30 @@ public class AdminRoomService {
         }
 
         room = roomRepository.save(room);
+
+         try {
+        String token = qrGenerationService.generateUniqueToken();
+        String qrUrl = qrGenerationService.generateRoomQRUrl(token);
+        byte[] qrImage = qrGenerationService.generateQRCodeImage(qrUrl, room.getRoomNumber());
+        String filename = qrGenerationService.generateAndSaveQRCode(qrUrl, "ROOM", room.getRoomNumber());
+        String imagePath = qrStorageService.storeQRCode(qrImage, filename, "room");
+        
+        room.setQrCodeToken(token);
+        room.setQrCodeUrl(qrUrl);
+        room.setQrImagePath(imagePath);
+        room.setQrGeneratedAt(LocalDateTime.now());
+        room = roomRepository.save(room);
+        
+        // Log QR generation
+        // QRCodeLog log = new QRCodeLog("ROOM", room.getId(), getCurrentAdmin(), token);
+        // log.setGenerationReason("Auto-generated on creation");
+        // qrCodeLogRepository.save(log);
+        
+    } catch (Exception e) {
+        // Log error but don't fail room creation
+        System.err.println("Failed to generate QR code for new room: " + e.getMessage());
+    }
+
         return mapToResponse(room);
     }
 
