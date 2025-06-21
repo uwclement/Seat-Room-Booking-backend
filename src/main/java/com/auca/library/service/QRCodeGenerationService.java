@@ -33,8 +33,8 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
 @Service
 public class QRCodeGenerationService {
 
-    @Value("${qr.base-url:http://localhost:3000}")
-    // @Value("${qr.base-url:http://192.168.1.77:3000}")
+    // @Value("${qr.base-url:http://localhost:8080}")
+    @Value("${qr.base-url:http://192.168.1.71:8080}")
     private String baseUrl;
 
     @Value("${qr.generation.size:300}")
@@ -237,7 +237,8 @@ public class QRCodeGenerationService {
         }
         
         // Check if it matches our expected URL pattern
-        String pattern = String.format("^%s/scan\\?type=(seat|room)&token=[a-f0-9\\-]{36}$", baseUrl.replace(".", "\\."));
+        String pattern = String.format("^%s/scan\\?type=(seat|room)&token=[a-f0-9\\-]{36}$", 
+           baseUrl.replace(".", "\\.").replace("/", "\\/"));
         return content.matches(pattern);
     }
 }

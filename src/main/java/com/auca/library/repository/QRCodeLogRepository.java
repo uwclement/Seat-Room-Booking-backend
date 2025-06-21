@@ -1,14 +1,18 @@
 package com.auca.library.repository;
 
-import com.auca.library.model.QRCodeLog;
-import com.auca.library.model.User;
+import java.time.LocalDateTime;
+import java.util.List;
+
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
-import java.util.List;
+import com.auca.library.model.QRCodeLog;
+import com.auca.library.model.User;
+
+import jakarta.transaction.Transactional;
 
 @Repository
 public interface QRCodeLogRepository extends JpaRepository<QRCodeLog, Long> {
@@ -27,4 +31,9 @@ public interface QRCodeLogRepository extends JpaRepository<QRCodeLog, Long> {
     
     @Query("SELECT q FROM QRCodeLog q WHERE q.resourceType = :type ORDER BY q.generatedAt DESC")
     List<QRCodeLog> findRecentByType(@Param("type") String resourceType);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE QRCodeLog q SET q.isCurrent = false WHERE q.resourceType = :resourceType AND q.resourceId = :resourceId")
+    void markAllAsNotCurrentForResource(@Param("resourceType") String resourceType, @Param("resourceId") Long resourceId);
 }
