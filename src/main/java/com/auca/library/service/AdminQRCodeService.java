@@ -82,6 +82,7 @@ public class AdminQRCodeService {
         seat.setQrVersion(currentVersion == null ? 1 : currentVersion + 1);
         seatRepository.save(seat);
         
+        qrCodeLogRepository.markAllAsNotCurrentForResource("SEAT", seatId);
         // Log generation
         QRCodeLog log = new QRCodeLog("SEAT", seatId, admin, newToken);
         log.setOldToken(oldToken);

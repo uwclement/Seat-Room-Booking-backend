@@ -71,6 +71,7 @@ public class SecurityConfig {
                     .requestMatchers("/api/notifications/stream").permitAll()
                     .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                     .requestMatchers("/scan/**").permitAll()
+                    .requestMatchers("/scan/info").permitAll()
                     .requestMatchers("/api/qr/image/**").permitAll()
                     .anyRequest().authenticated()
             );
@@ -84,8 +85,8 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000"));
-        // configuration.setAllowedOrigins(Arrays.asList("http://192.168.1.77:3000"));
+        // configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000"));
+        configuration.setAllowedOrigins(Arrays.asList("http://192.168.1.71:3000"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("authorization", "content-type", "x-auth-token"));
         configuration.setExposedHeaders(Arrays.asList("x-auth-token"));
