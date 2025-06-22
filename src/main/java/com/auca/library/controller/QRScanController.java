@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.auca.library.dto.response.MessageResponse;
-import com.auca.library.dto.response.QRScanContext;
 import com.auca.library.dto.response.QRScanResponse;
 import com.auca.library.model.Booking;
 import com.auca.library.model.BookingParticipant;
@@ -36,7 +35,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
-@RequestMapping("/scan")
+@RequestMapping("api/scan")
 @CrossOrigin(origins = "*", maxAge = 3600)
 @Tag(name = "QR Code Scanning", description = "Public endpoints for QR code scanning")
 public class QRScanController {

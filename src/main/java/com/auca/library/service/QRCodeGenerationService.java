@@ -33,8 +33,8 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
 @Service
 public class QRCodeGenerationService {
 
-    // @Value("${qr.base-url:http://localhost:8080}")
-    @Value("${qr.base-url:http://192.168.1.71:8080}")
+    // @Value("${qr.base-url:http://localhost:3000}")
+    @Value("${qr.base-url:http://192.168.1.71:3000}")
     private String baseUrl;
 
     @Value("${qr.generation.size:300}")
@@ -63,15 +63,16 @@ public class QRCodeGenerationService {
      * Generate QR code URL for seats
      */
     public String generateSeatQRUrl(String token) {
-        return String.format("%s/scan?type=seat&token=%s", baseUrl, token);
-    }
+    return String.format("%s/scan?type=seat&token=%s", baseUrl, token);
+}
+
 
     /**
      * Generate QR code URL for rooms
      */
     public String generateRoomQRUrl(String token) {
-        return String.format("%s/scan?type=room&token=%s", baseUrl, token);
-    }
+    return String.format("%s/scan?type=room&token=%s", baseUrl, token);
+}
 
     /**
      * Generate QR code image and return as byte array

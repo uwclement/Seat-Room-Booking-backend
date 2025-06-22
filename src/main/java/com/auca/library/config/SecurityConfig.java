@@ -70,8 +70,8 @@ public class SecurityConfig {
                     .requestMatchers("/api/test/**").permitAll()
                     .requestMatchers("/api/notifications/stream").permitAll()
                     .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                    .requestMatchers("/scan/**").permitAll()
-                    .requestMatchers("/scan/info").permitAll()
+                    .requestMatchers("api/scan/**").permitAll()
+                    .requestMatchers("api/scan/info").permitAll()
                     .requestMatchers("/api/qr/image/**").permitAll()
                     .anyRequest().authenticated()
             );
