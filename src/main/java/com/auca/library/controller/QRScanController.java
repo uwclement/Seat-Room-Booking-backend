@@ -19,9 +19,11 @@ import com.auca.library.dto.response.QRScanResponse;
 import com.auca.library.model.Booking;
 import com.auca.library.model.BookingParticipant;
 import com.auca.library.model.RoomBooking;
+import com.auca.library.model.User;
 import com.auca.library.repository.BookingParticipantRepository;
 import com.auca.library.repository.BookingRepository;
 import com.auca.library.repository.RoomBookingRepository;
+import com.auca.library.repository.UserRepository;
 import com.auca.library.service.BookingService;
 import com.auca.library.service.QRScanService;
 import com.auca.library.service.RoomBookingService;
@@ -33,7 +35,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
-@RequestMapping("/scan")
+@RequestMapping("api/scan")
 @CrossOrigin(origins = "*", maxAge = 3600)
 @Tag(name = "QR Code Scanning", description = "Public endpoints for QR code scanning")
 public class QRScanController {
@@ -56,6 +58,9 @@ public class QRScanController {
     @Autowired
     private BookingParticipantRepository participantRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
     /**
      * Public QR code scan endpoint - accessible without authentication
      */
@@ -76,16 +81,30 @@ public class QRScanController {
             @RequestParam String token,
             Authentication authentication) {
         
-        // Get user email if authenticated
+        // Get user email if authenticated (can be null for public scans)
         String userEmail = authentication != null ? authentication.getName() : null;
         
-        // Process scan
-        QRScanResponse response = qrScanService.processScan(type, token, userEmail);
-        
-        // Log scan
-        qrScanService.logScan(type, token, userEmail, response.isSuccess());
-        
-        return ResponseEntity.ok(response);
+        try {
+            // Process scan
+            QRScanResponse response = qrScanService.processScan(type, token, userEmail);
+            
+            // Log scan (with better error handling)
+            logScanSafely(type, token, userEmail, response.isSuccess());
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            // Log error but don't fail the main operation
+            logScanSafely(type, token, userEmail, false);
+            
+            // Return user-friendly error response
+            QRScanResponse errorResponse = new QRScanResponse();
+            errorResponse.setSuccess(false);
+            errorResponse.setMessage("Failed to process QR code. Please try again.");
+            errorResponse.setAction("ERROR");
+            errorResponse.setErrorCode("PROCESSING_ERROR");
+            
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
     }
 
     /**
@@ -130,6 +149,68 @@ public class QRScanController {
         } catch (Exception e) {
             return ResponseEntity.badRequest()
                 .body(new MessageResponse("Check-in failed: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Process stored QR scan after login
+     */
+    @PostMapping("/process-stored")
+    @Operation(
+        summary = "Process stored QR scan after login", 
+        description = "Validates QR code against user's current booking for in-app check-in"
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Stored scan processed"),
+        @ApiResponse(responseCode = "401", description = "Unauthorized")
+    })
+    public ResponseEntity<QRScanResponse> processStoredScan(
+            @RequestBody QRScanContext scanContext,
+            Authentication authentication) {
+        
+        if (authentication == null) {
+            QRScanResponse errorResponse = new QRScanResponse();
+            errorResponse.setSuccess(false);
+            errorResponse.setRequiresAuthentication(true);
+            errorResponse.setMessage("Authentication required");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
+        }
+        
+        String userEmail = authentication.getName();
+        
+        try {
+            // Process the stored scan with user context
+            QRScanResponse response = qrScanService.processScan(
+                scanContext.getType(), 
+                scanContext.getToken(), 
+                userEmail
+            );
+            
+            // Log the completion of stored scan
+            logScanSafely(scanContext.getType(), scanContext.getToken(), userEmail, response.isSuccess());
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logScanSafely(scanContext.getType(), scanContext.getToken(), userEmail, false);
+            
+            QRScanResponse errorResponse = new QRScanResponse();
+            errorResponse.setSuccess(false);
+            errorResponse.setMessage("Failed to process stored scan");
+            errorResponse.setAction("ERROR");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+        /**
+     * NEW: Safe logging method that doesn't cause transaction rollback
+     */
+    private void logScanSafely(String type, String token, String userEmail, boolean success) {
+        try {
+            // Use a separate transaction for logging to avoid rollback issues
+            qrScanService.logScanAsync(type, token, userEmail, success);
+        } catch (Exception e) {
+            // Log to console but don't fail the main operation
+            System.err.println("Failed to log QR scan: " + e.getMessage());
         }
     }
 
@@ -267,50 +348,63 @@ private Long extractBookingId(Object bookingDetails) {
         return ResponseEntity.ok(new MessageResponse("Check-in successful"));
     }
 
-    private ResponseEntity<MessageResponse> processRoomCheckIn(Long bookingId, Long participantId, String userEmail) {
-        RoomBooking booking = roomBookingRepository.findById(bookingId)
-                .orElseThrow(() -> new RuntimeException("Booking not found"));
-        
-        // Check if user is organizer
-        if (booking.getUser().getEmail().equals(userEmail)) {
-            // Organizer check-in
-            if (booking.getCheckedInAt() != null) {
-                return ResponseEntity.ok(new MessageResponse("Already checked in"));
-            }
-            
-            booking.setCheckedInAt(LocalDateTime.now());
-            booking.setStatus(RoomBooking.BookingStatus.CHECKED_IN);
-            roomBookingRepository.save(booking);
-            
-            return ResponseEntity.ok(new MessageResponse("Check-in successful"));
-        }
-        
-        // Participant check-in
-        if (participantId == null) {
-            return ResponseEntity.badRequest()
-                .body(new MessageResponse("Participant ID required for participant check-in"));
-        }
-        
-        BookingParticipant participant = participantRepository.findById(participantId)
-                .orElseThrow(() -> new RuntimeException("Participant record not found"));
-        
-        // Verify participant belongs to user
-        if (!participant.getUser().getEmail().equals(userEmail)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(new MessageResponse("This participant record does not belong to you"));
-        }
-        
-        // Check if already checked in
-        if (participant.getCheckedInAt() != null) {
-            return ResponseEntity.ok(new MessageResponse("Already checked in as participant"));
-        }
-        
-        // Perform participant check-in
-        participant.setCheckedInAt(LocalDateTime.now());
-        participantRepository.save(participant);
-        
-        return ResponseEntity.ok(new MessageResponse("Participant check-in successful"));
+   private ResponseEntity<MessageResponse> processRoomCheckIn(Long bookingId, Long participantId, String userEmail) {
+    RoomBooking booking = roomBookingRepository.findById(bookingId)
+            .orElseThrow(() -> new RuntimeException("Booking not found"));
+    
+    User user = userRepository.findByEmail(userEmail)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+    
+    // NEW: Verify we're still within check-in window
+    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime checkInStart = booking.getStartTime().minusMinutes(10);
+    LocalDateTime checkInEnd = booking.getStartTime().plusMinutes(10);
+    
+    if (now.isBefore(checkInStart) || now.isAfter(checkInEnd)) {
+        return ResponseEntity.badRequest()
+            .body(new MessageResponse("Check-in window has expired"));
     }
+    
+    // Check if user is organizer
+    if (booking.getUser().getEmail().equals(userEmail)) {
+        // Organizer check-in
+        if (booking.getCheckedInAt() != null) {
+            return ResponseEntity.ok(new MessageResponse("Already checked in"));
+        }
+        
+        booking.setCheckedInAt(LocalDateTime.now());
+        booking.setStatus(RoomBooking.BookingStatus.CHECKED_IN);
+        roomBookingRepository.save(booking);
+        
+        return ResponseEntity.ok(new MessageResponse("Check-in successful"));
+    }
+    
+    // Participant check-in
+    if (participantId == null) {
+        return ResponseEntity.badRequest()
+            .body(new MessageResponse("Participant ID required for participant check-in"));
+    }
+    
+    BookingParticipant participant = participantRepository.findById(participantId)
+            .orElseThrow(() -> new RuntimeException("Participant record not found"));
+    
+    // Verify participant belongs to user
+    if (!participant.getUser().getEmail().equals(userEmail)) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+            .body(new MessageResponse("This participant record does not belong to you"));
+    }
+    
+    // Check if already checked in
+    if (participant.getCheckedInAt() != null) {
+        return ResponseEntity.ok(new MessageResponse("Already checked in as participant"));
+    }
+    
+    // Perform participant check-in
+    participant.setCheckedInAt(LocalDateTime.now());
+    participantRepository.save(participant);
+    
+    return ResponseEntity.ok(new MessageResponse("Participant check-in successful"));
+}
 
     private String extractTokenFromQRContent(String qrContent) {
         if (qrContent == null || qrContent.isEmpty()) {
@@ -332,6 +426,7 @@ private Long extractBookingId(Object bookingDetails) {
         
         return qrContent.substring(tokenStart, tokenEnd);
     }
+
 
     private String extractTypeFromQRContent(String qrContent) {
         if (qrContent == null || qrContent.isEmpty()) {
@@ -356,6 +451,22 @@ private Long extractBookingId(Object bookingDetails) {
 
     // Inner classes for request/response DTOs
     
+     public static class QRScanContext {
+        private String token;
+        private String type;
+        private String resourceIdentifier;
+        private String scannedAt;
+        
+        // Getters and setters
+        public String getToken() { return token; }
+        public void setToken(String token) { this.token = token; }
+        public String getType() { return type; }
+        public void setType(String type) { this.type = type; }
+        public String getResourceIdentifier() { return resourceIdentifier; }
+        public void setResourceIdentifier(String resourceIdentifier) { this.resourceIdentifier = resourceIdentifier; }
+        public String getScannedAt() { return scannedAt; }
+        public void setScannedAt(String scannedAt) { this.scannedAt = scannedAt; }
+    }
     public static class QRValidationRequest {
         private String qrContent;
         private Long expectedBookingId;
