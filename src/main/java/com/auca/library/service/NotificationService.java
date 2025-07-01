@@ -367,4 +367,57 @@ public class NotificationService {
         }
     }
 
+
+    public void sendEquipmentRequestNotification(String userEmail, String equipmentName, String status, String reason) {
+    String title = "Equipment Request " + status;
+    String message = String.format("Your request for %s has been %s", equipmentName, status.toLowerCase());
+    
+    if (reason != null && !reason.trim().isEmpty()) {
+        message += ". Reason: " + reason;
+    }
+    
+    addNotification(userEmail, title, message, "EQUIPMENT_" + status.toUpperCase());
+}
+
+public void sendProfessorApprovalNotification(String professorEmail, boolean approved, String reason) {
+    String title = approved ? "Professor Account Approved" : "Professor Account Rejected";
+    String message = approved ? 
+        "Your professor account has been approved. You can now select courses and make equipment requests." :
+        "Your professor account application has been rejected.";
+    
+    if (!approved && reason != null) {
+        message += " Reason: " + reason;
+    }
+    
+    addNotification(professorEmail, title, message, 
+        approved ? "PROFESSOR_APPROVED" : "PROFESSOR_REJECTED");
+}
+
+public void sendCourseApprovalNotification(String professorEmail, List<String> courseNames, boolean approved) {
+    String title = approved ? "Courses Approved" : "Course Request Rejected";
+    String coursesText = String.join(", ", courseNames);
+    String message = approved ?
+        String.format("Your courses have been approved: %s", coursesText) :
+        String.format("Your course request has been rejected: %s", coursesText);
+    
+    addNotification(professorEmail, title, message, 
+        approved ? "PROFESSOR_COURSES_APPROVED" : "PROFESSOR_COURSES_REJECTED");
+}
+
+public void sendLowInventoryAlert(String adminEmail, String equipmentName, int currentQuantity) {
+    String title = "Low Inventory Alert";
+    String message = String.format("Equipment '%s' has low inventory. Current available quantity: %d", 
+        equipmentName, currentQuantity);
+    
+    addNotification(adminEmail, title, message, "LOW_INVENTORY_ALERT");
+}
+
+public void sendEscalationNotification(String hodEmail, String professorName, String equipmentName) {
+    String title = "Equipment Request Escalation";
+    String message = String.format("Professor %s has escalated a rejected equipment request for %s", 
+        professorName, equipmentName);
+    
+    addNotification(hodEmail, title, message, "EQUIPMENT_ESCALATION");
+}
+
 }

@@ -1,5 +1,6 @@
 package com.auca.library.model;
 
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -12,6 +13,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.validation.constraints.Email;
@@ -68,6 +70,22 @@ public class User {
     private boolean emailVerified = false;
     
     private String verificationToken;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+    name = "professor_courses",
+    joinColumns = @JoinColumn(name = "user_id"),
+    inverseJoinColumns = @JoinColumn(name = "course_id"))
+
+    private Set<Course> approvedCourses = new HashSet<>();
+
+// Professor status fields
+    private boolean professorApproved = false;
+    private LocalDateTime professorApprovedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "approved_by_hod")
+    private User approvedByHod;
 
     public User(String fullName, String email, String studentId, String password) {
         this.fullName = fullName;

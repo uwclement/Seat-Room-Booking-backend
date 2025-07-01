@@ -1636,4 +1636,36 @@ private double calculateTotalHours(List<RoomBooking> bookings) {
             .sum();
 }
 
+// @Transactional
+// public MessageResponse updateRoomBookingEquipmentRequests(Long bookingId, List<Long> equipmentIds, String userEmail) {
+//     RoomBooking booking = findBookingById(bookingId);
+//     User user = findUserByEmail(userEmail);
+    
+//     // Validate user owns this booking
+//     if (!booking.getUser().equals(user)) {
+//         throw new IllegalArgumentException("You can only modify your own bookings");
+//     }
+    
+//     // Clear existing equipment requests
+//     booking.getRequestedEquipment().clear();
+    
+//     // Add new equipment requests
+//     if (equipmentIds != null && !equipmentIds.isEmpty()) {
+//         Set<Equipment> equipment = equipmentIds.stream()
+//                 .map(this::findEquipmentById)
+//                 .filter(eq -> {
+//                     // For students, only allow equipment marked as allowedToStudents
+//                     if (hasRole(user, "ROLE_USER")) {
+//                         return eq.isAllowedToStudents();
+//                     }
+//                     return true; // Professors can request any equipment
+//                 })
+//                 .collect(Collectors.toSet());
+//         booking.setRequestedEquipment(equipment);
+//     }
+    
+//     roomBookingRepository.save(booking);
+//     return new MessageResponse("Equipment requests updated successfully");
+// }
+
 }

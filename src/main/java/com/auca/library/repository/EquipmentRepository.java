@@ -37,4 +37,28 @@ public interface EquipmentRepository extends JpaRepository<Equipment, Long> {
     Long countAvailableEquipment();
 
     List<Equipment> findByAvailable(boolean available);
+
+
+    List<Equipment> findByAllowedToStudentsTrue();
+    
+    @Query("SELECT e FROM Equipment e WHERE e.allowedToStudents = true AND e.available = true")
+    List<Equipment> findStudentAllowedAndAvailable();
+    
+    @Query("SELECT e FROM Equipment e WHERE e.availableQuantity < :threshold")
+    List<Equipment> findLowInventoryEquipment(@Param("threshold") Integer threshold);
+    
+    @Query("SELECT e FROM Equipment e WHERE e.availableQuantity = 0 AND e.available = true")
+    List<Equipment> findOutOfStockEquipment();
+    
+    
+    @Query("SELECT DISTINCT e FROM Equipment e JOIN e.labClasses l WHERE l.id = :labId")
+    List<Equipment> findByLabClassId(@Param("labId") Long labId);
+    
+    @Query("SELECT e FROM Equipment e WHERE e.rooms IS EMPTY AND e.labClasses IS EMPTY")
+    List<Equipment> findUnassignedEquipment();
+    
+    
+    @Query("SELECT COUNT(e) FROM Equipment e WHERE e.allowedToStudents = true")
+    Long countStudentAllowedEquipment();
+    
 }

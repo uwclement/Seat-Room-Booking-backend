@@ -23,7 +23,7 @@ public class Role {
     private Long id;
 
     @Enumerated(EnumType.STRING)
-    @Column(length = 20)
+    @Column(length = 30)
     private ERole name;
 
     public Role(ERole name) {
@@ -31,7 +31,10 @@ public class Role {
     }
 
     public enum ERole {
-        ROLE_USER,
-        ROLE_ADMIN
+        ROLE_USER,  
+        ROLE_ADMIN,
+        ROLE_EQUIPMENT_ADMIN, 
+        ROLE_PROFESSOR,      
+        ROLE_HOD 
     }
 }

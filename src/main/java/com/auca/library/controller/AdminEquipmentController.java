@@ -9,13 +9,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
-@RequestMapping("/api/admin/equipment")
-@PreAuthorize("hasRole('ADMIN')")
+@RequestMapping("/api/equipment-admin/equipment")
+@PreAuthorize("hasRole('EQUIPMENT_ADMIN')")
 public class AdminEquipmentController {
 
     @Autowired
@@ -30,6 +29,12 @@ public class AdminEquipmentController {
     @GetMapping("/available")
     public ResponseEntity<List<EquipmentResponse>> getAvailableEquipment() {
         List<EquipmentResponse> equipment = equipmentService.getAvailableEquipment();
+        return ResponseEntity.ok(equipment);
+    }
+
+    @GetMapping("/student-allowed")
+    public ResponseEntity<List<EquipmentResponse>> getStudentAllowedEquipment() {
+        List<EquipmentResponse> equipment = equipmentService.getStudentAllowedEquipment();
         return ResponseEntity.ok(equipment);
     }
 
@@ -69,4 +74,3 @@ public class AdminEquipmentController {
         return ResponseEntity.ok(equipment);
     }
 }
-
