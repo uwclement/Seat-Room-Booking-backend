@@ -32,11 +32,31 @@ public class Equipment {
     @Column(nullable = false)
     private boolean available = true;
 
-    public Equipment(String name, String description) {
-        this.name = name;
-        this.description = description;
-    }
+    // Allow students to request this equipment
+    @Column(nullable = false)
+    private boolean allowedToStudents = false;
+
+    private Integer quantity;
+
+    private Integer availableQuantity;
+
 
     @ManyToMany(mappedBy = "equipment")
     private Set<Room> rooms = new HashSet<>();
+
+    // Lab classes that have this equipment
+    @ManyToMany(mappedBy = "equipment")
+    private Set<LabClass> labClasses = new HashSet<>();
+
+    public Equipment(String name, String description) {
+        this.name = name;
+        this.description = description;
+        this.quantity = 1; // Default quantity
+        this.availableQuantity = 1;
+    }
+
+    // Helper method to check if equipment is available in requested quantity
+    public boolean isAvailableInQuantity(int requestedQuantity) {
+        return available && availableQuantity != null && availableQuantity >= requestedQuantity;
+    }
 }

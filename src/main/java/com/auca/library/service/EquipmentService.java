@@ -9,7 +9,6 @@ import com.auca.library.repository.EquipmentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -31,6 +30,14 @@ public class EquipmentService {
                 .collect(Collectors.toList());
     }
 
+    // NEW: Get equipment allowed for students
+    public List<EquipmentResponse> getStudentAllowedEquipment() {
+        return equipmentRepository.findAll().stream()
+                .filter(eq -> eq.isAllowedToStudents() && eq.isAvailable())
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
     public EquipmentResponse getEquipmentById(Long id) {
         Equipment equipment = findEquipmentById(id);
         return mapToResponse(equipment);
@@ -44,6 +51,13 @@ public class EquipmentService {
 
         Equipment equipment = new Equipment(request.getName(), request.getDescription());
         equipment.setAvailable(request.isAvailable());
+        equipment.setAllowedToStudents(request.isAllowedToStudents());
+        
+        // Set quantity fields
+        if (request.getQuantity() != null && request.getQuantity() > 0) {
+            equipment.setQuantity(request.getQuantity());
+            equipment.setAvailableQuantity(request.getQuantity());
+        }
         
         equipment = equipmentRepository.save(equipment);
         return mapToResponse(equipment);
@@ -53,7 +67,7 @@ public class EquipmentService {
     public EquipmentResponse updateEquipment(Long id, EquipmentRequest request) {
         Equipment equipment = findEquipmentById(id);
 
-        // Check if name is being changed and if it conflicts
+        // Check if name is being changed and conflicts
         if (!equipment.getName().equals(request.getName()) && 
             equipmentRepository.existsByName(request.getName())) {
             throw new IllegalArgumentException("Equipment with name '" + request.getName() + "' already exists");
@@ -62,6 +76,18 @@ public class EquipmentService {
         equipment.setName(request.getName());
         equipment.setDescription(request.getDescription());
         equipment.setAvailable(request.isAvailable());
+        equipment.setAllowedToStudents(request.isAllowedToStudents());
+        
+        // Update quantity - be careful not to go below current reservations
+        if (request.getQuantity() != null && request.getQuantity() > 0) {
+            int currentReserved = equipment.getQuantity() - equipment.getAvailableQuantity();
+            if (request.getQuantity() >= currentReserved) {
+                equipment.setQuantity(request.getQuantity());
+                equipment.setAvailableQuantity(request.getQuantity() - currentReserved);
+            } else {
+                throw new IllegalArgumentException("Cannot reduce quantity below currently reserved amount");
+            }
+        }
 
         equipment = equipmentRepository.save(equipment);
         return mapToResponse(equipment);
@@ -82,6 +108,27 @@ public class EquipmentService {
         return mapToResponse(equipment);
     }
 
+    // NEW: Reserve equipment quantity
+    @Transactional
+    public boolean reserveEquipment(Long equipmentId, int quantity) {
+        Equipment equipment = findEquipmentById(equipmentId);
+        if (equipment.isAvailableInQuantity(quantity)) {
+            equipment.setAvailableQuantity(equipment.getAvailableQuantity() - quantity);
+            equipmentRepository.save(equipment);
+            return true;
+        }
+        return false;
+    }
+
+    // NEW: Release equipment quantity
+    @Transactional
+    public void releaseEquipment(Long equipmentId, int quantity) {
+        Equipment equipment = findEquipmentById(equipmentId);
+        int newAvailable = Math.min(equipment.getAvailableQuantity() + quantity, equipment.getQuantity());
+        equipment.setAvailableQuantity(newAvailable);
+        equipmentRepository.save(equipment);
+    }
+
     public List<EquipmentResponse> searchEquipment(String keyword) {
         return equipmentRepository.searchEquipment(keyword).stream()
                 .map(this::mapToResponse)
@@ -99,6 +146,9 @@ public class EquipmentService {
         response.setName(equipment.getName());
         response.setDescription(equipment.getDescription());
         response.setAvailable(equipment.isAvailable());
+        response.setAllowedToStudents(equipment.isAllowedToStudents());
+        response.setQuantity(equipment.getQuantity());
+        response.setAvailableQuantity(equipment.getAvailableQuantity());
         return response;
     }
 }
