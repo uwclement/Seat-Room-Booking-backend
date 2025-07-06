@@ -1,5 +1,14 @@
 package com.auca.library.service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.auca.library.dto.request.LabClassRequest;
 import com.auca.library.dto.response.LabClassResponse;
 import com.auca.library.dto.response.MessageResponse;
@@ -8,13 +17,6 @@ import com.auca.library.model.Equipment;
 import com.auca.library.model.LabClass;
 import com.auca.library.repository.EquipmentRepository;
 import com.auca.library.repository.LabClassRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 public class LabClassService {
@@ -144,12 +146,14 @@ public class LabClassService {
         response.setAvailable(labClass.isAvailable());
         
         // Map equipment
+        Set<Equipment> equipment = labClass.getEquipment();
         response.setEquipmentIds(labClass.getEquipment().stream()
                 .map(Equipment::getId)
                 .collect(Collectors.toList()));
         response.setEquipmentNames(labClass.getEquipment().stream()
                 .map(Equipment::getName)
                 .collect(Collectors.toList()));
+        response.setEquipmentCount(equipment.size());        
         
         return response;
     }

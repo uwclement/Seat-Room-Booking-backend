@@ -1,5 +1,23 @@
 package com.auca.library.controller;
 
+import java.util.List;
+import java.util.Set;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.auca.library.dto.request.BulkSeatUpdateRequest;
 import com.auca.library.dto.request.QRBulkGenerationRequest;
 import com.auca.library.dto.response.BulkQRGenerationResponse;
@@ -8,21 +26,10 @@ import com.auca.library.dto.response.QRCodeGenerationResponse;
 import com.auca.library.dto.response.SeatDTO;
 import com.auca.library.service.AdminQRCodeService;
 import com.auca.library.service.SeatService;
-import org.springframework.security.core.Authentication;
 
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Set;
-import java.util.Map;
-import java.util.Date;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
@@ -112,14 +119,14 @@ public ResponseEntity<QRCodeGenerationResponse> generateSeatQR(@PathVariable Lon
     }
 }
 
-// Fixed helper method - change return type to match usage
-private QRCodeGenerationResponse createQRErrorResponse(String message) {
-    QRCodeGenerationResponse errorResponse = new QRCodeGenerationResponse();
-    errorResponse.setSuccess(false);
-    errorResponse.setErrorMessage(message);
-    // errorResponse.setTimestamp(new Date().toString());
-    return errorResponse;
-}
+// // Fixed helper method - change return type to match usage
+// private QRCodeGenerationResponse createQRErrorResponse(String message) {
+//     QRCodeGenerationResponse errorResponse = new QRCodeGenerationResponse();
+//     errorResponse.setSuccess(false);
+//     errorResponse.setErrorMessage(message);
+//     // errorResponse.setTimestamp(new Date().toString());
+//     return errorResponse;
+// }
 
       @PostMapping("/bulk-generate-qr")
       @Operation(summary = "Bulk generate QR codes for seats", description = "Generate QR codes for multiple seats")

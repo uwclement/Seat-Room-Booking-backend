@@ -1,16 +1,18 @@
 package com.auca.library.service;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.auca.library.dto.request.EquipmentRequest;
 import com.auca.library.dto.response.EquipmentResponse;
 import com.auca.library.dto.response.MessageResponse;
 import com.auca.library.exception.ResourceNotFoundException;
 import com.auca.library.model.Equipment;
 import com.auca.library.repository.EquipmentRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class EquipmentService {

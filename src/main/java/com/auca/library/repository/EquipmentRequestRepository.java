@@ -37,4 +37,8 @@ public interface EquipmentRequestRepository extends JpaRepository<EquipmentReque
     
     @Query("SELECT er FROM EquipmentRequest er WHERE er.labClass.id = :labId")
     List<EquipmentRequest> findByLabClassId(@Param("labId") Long labId);
+
+    @Query("SELECT er FROM EquipmentRequest er WHERE er.createdAt >= :startDate AND er.createdAt <= :endDate ORDER BY er.createdAt DESC")
+    List<EquipmentRequest> findRequestsInDateRange(@Param("startDate") LocalDateTime startDate, 
+                                             @Param("endDate") LocalDateTime endDate);
 }

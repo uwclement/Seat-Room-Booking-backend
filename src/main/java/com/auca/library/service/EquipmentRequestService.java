@@ -1,18 +1,30 @@
 package com.auca.library.service;
 
-import com.auca.library.dto.request.EquipmentRequestRequest;
-import com.auca.library.dto.request.EquipmentRequestApprovalRequest;
-import com.auca.library.dto.response.EquipmentRequestResponse;
-import com.auca.library.dto.response.MessageResponse;
-import com.auca.library.exception.ResourceNotFoundException;
-import com.auca.library.model.*;
-import com.auca.library.repository.*;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.auca.library.dto.request.EquipmentRequestApprovalRequest;
+import com.auca.library.dto.request.EquipmentRequestRequest;
+import com.auca.library.dto.response.EquipmentRequestResponse;
+import com.auca.library.dto.response.MessageResponse;
+import com.auca.library.exception.ResourceNotFoundException;
+import com.auca.library.model.Course;
+import com.auca.library.model.Equipment;
+import com.auca.library.model.EquipmentRequest;
+import com.auca.library.model.LabClass;
+import com.auca.library.model.User;
+import com.auca.library.repository.CourseRepository;
+import com.auca.library.repository.EquipmentRepository;
+import com.auca.library.repository.EquipmentRequestRepository;
+import com.auca.library.repository.LabClassRepository;
+import com.auca.library.repository.RoomBookingRepository;
+import com.auca.library.repository.UserRepository;
+import java.time.Duration;
 
 @Service
 public class EquipmentRequestService {
@@ -115,8 +127,11 @@ public class EquipmentRequestService {
         EquipmentRequest equipmentRequest = findRequestById(requestId);
         User admin = findUserByEmail(adminEmail);
         
-        if (equipmentRequest.getStatus() != EquipmentRequest.RequestStatus.PENDING) {
-            throw new IllegalStateException("Only pending requests can be approved/rejected");
+        if (equipmentRequest.getStatus() != EquipmentRequest.RequestStatus.PENDING || 
+            equipmentRequest.getStatus() != EquipmentRequest.RequestStatus.APPROVED || 
+            equipmentRequest.getStatus() != EquipmentRequest.RequestStatus.REJECTED   
+        )  {
+            throw new IllegalStateException("this request can't be approved");
         }
         
         equipmentRequest.setApprovedBy(admin);
@@ -346,13 +361,26 @@ public class EquipmentRequestService {
     }
 
     private String getEquipmentAdminEmail() {
-        // TODO: Implement logic to get equipment admin email
-        return "equipment.admin@auca.ac.rw";
-    }
+    return userRepository.findEquipmentAdmin()
+            .map(User::getEmail)
+            .orElse(null); 
+   }
 
     private String getHodEmail() {
-        // TODO: Implement logic to get HOD email
-        return "hod@auca.ac.rw";
+        return userRepository.findHod()
+                .map(User::getEmail)
+                .orElse(null); 
+    }
+
+
+    // Get all equipment requests for the current month (Equipment Admin)
+    public List<EquipmentRequestResponse> getCurrentMonthRequests() {
+    LocalDateTime startOfMonth = LocalDateTime.now().withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0).withNano(0);
+    LocalDateTime endOfMonth = startOfMonth.plusMonths(1).minusNanos(1);
+    
+    return equipmentRequestRepository.findRequestsInDateRange(startOfMonth, endOfMonth).stream()
+            .map(this::mapToResponse)
+            .collect(Collectors.toList());
     }
 
     private EquipmentRequestResponse mapToResponse(EquipmentRequest request) {
@@ -371,6 +399,15 @@ public class EquipmentRequestService {
         response.setApprovedAt(request.getApprovedAt());
         response.setEscalatedToHod(request.isEscalatedToHod());
         response.setEscalatedAt(request.getEscalatedAt());
+        response.setUserId(request.getUser().getId());
+        response.setUserFullName(request.getUser().getFullName());
+
+        if (request.getStartTime() != null && request.getEndTime() != null) {
+        Duration duration = Duration.between(request.getStartTime(), request.getEndTime());
+        response.setDurationHours(duration.toHours());
+        } else {
+        response.setDurationHours(0L);
+        }
         
         if (request.getCourse() != null) {
             response.setCourseId(request.getCourse().getId());

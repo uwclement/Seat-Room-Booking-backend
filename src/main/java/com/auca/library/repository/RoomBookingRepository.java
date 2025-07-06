@@ -15,7 +15,6 @@ import com.auca.library.dto.response.RecurringSeriesStats;
 import com.auca.library.model.RecurringBookingSeries;
 import com.auca.library.model.Room;
 import com.auca.library.model.RoomBooking;
-import com.auca.library.model.RoomCategory;
 import com.auca.library.model.User;
 
 @Repository
@@ -289,7 +288,7 @@ Double findAverageApprovalTimeHours(@Param("startDate") LocalDateTime startDate)
             @Param("search") String search,
             Pageable pageable);
 
-    List<RoomBooking> findAll();
+
     List<RoomBooking> findByStartTimeBetween(LocalDateTime start, LocalDateTime end);
 
     @Query("SELECT rb FROM RoomBooking rb WHERE rb.status = 'PENDING'")

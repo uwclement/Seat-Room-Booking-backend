@@ -1,6 +1,16 @@
 package com.auca.library.service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.auca.library.dto.request.ProfessorCourseRequest;
+import com.auca.library.dto.response.CourseResponse;
 import com.auca.library.dto.response.MessageResponse;
 import com.auca.library.dto.response.ProfessorResponse;
 import com.auca.library.exception.ResourceNotFoundException;
@@ -8,13 +18,6 @@ import com.auca.library.model.Course;
 import com.auca.library.model.User;
 import com.auca.library.repository.CourseRepository;
 import com.auca.library.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 public class ProfessorService {
@@ -51,24 +54,40 @@ public class ProfessorService {
                 .map(Course::getCourseName)
                 .collect(Collectors.joining(", "));
         
-        notificationService.addNotification(
-            getHodEmail(),
-            "Professor Course Approval Request",
-            String.format("Professor %s has requested approval for courses: %s", 
-                professor.getFullName(), courseNames),
-            "PROFESSOR_COURSE_REQUEST"
-        );
+        String hodEmail = getHodEmail();
+        if (hodEmail != null) {
+            notificationService.addNotification(
+                hodEmail,
+                "Professor Course Approval Request",
+                String.format("Professor %s has requested approval for courses: %s", 
+                    professor.getFullName(), courseNames),
+                "PROFESSOR_COURSE_REQUEST"
+            );
+        } else {
+            // Log warning that no HOD is available
+            System.out.println("Warning: Cannot notify HOD - no HOD user found in system");
+        }
         
         return new MessageResponse("Course approval request submitted successfully");
     }
 
     // Get professor's approved courses
-    public List<Course> getProfessorApprovedCourses(String professorEmail) {
-        User professor = findUserByEmail(professorEmail);
-        return professor.getApprovedCourses().stream()
-                .filter(Course::isActive)
-                .collect(Collectors.toList());
-    }
+    public List<CourseResponse> getProfessorApprovedCourses(String professorEmail) {
+    User professor = findUserByEmail(professorEmail);
+    return professor.getApprovedCourses().stream()
+            .filter(Course::isActive)
+            .map(course -> {
+                CourseResponse response = new CourseResponse();
+                response.setId(course.getId());
+                response.setCourseCode(course.getCourseCode());
+                response.setCourseName(course.getCourseName());
+                response.setCreditHours(course.getCreditHours());
+                response.setActive(course.isActive());
+                response.setProfessorCount(course.getProfessors().size());
+                return response;
+            })
+            .collect(Collectors.toList());
+}
 
     // Get pending professor approvals (HOD)
     public List<ProfessorResponse> getPendingProfessorApprovals() {
@@ -130,22 +149,23 @@ public class ProfessorService {
 
     private User findUserByEmail(String email) {
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
     }
 
     private User findUserById(Long id) {
         return userRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
     }
 
     private Course findCourseById(Long id) {
         return courseRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Course not found: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + id));
     }
 
     private String getHodEmail() {
-        // TODO: Implement logic to get HOD email
-        return "hod@auca.ac.rw";
+        return userRepository.findHod()
+                .map(User::getEmail)
+                .orElse(null); // Return null if no HOD found
     }
 
     private ProfessorResponse mapToProfessorResponse(User professor) {
