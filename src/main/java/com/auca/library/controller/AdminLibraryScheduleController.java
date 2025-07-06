@@ -4,7 +4,6 @@ import com.auca.library.dto.request.RecurringClosureRequest;
 import com.auca.library.dto.response.LibraryClosureExceptionResponse;
 import com.auca.library.dto.response.LibraryScheduleResponse;
 import com.auca.library.dto.response.MessageResponse;
-import com.auca.library.dto.response.LibraryStatusResponse;
 import com.auca.library.service.LibraryScheduleService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;

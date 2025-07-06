@@ -51,7 +51,7 @@ public class Equipment {
     public Equipment(String name, String description) {
         this.name = name;
         this.description = description;
-        this.quantity = 1; // Default quantity
+        this.quantity = 1; // efault quantity
         this.availableQuantity = 1;
     }
 

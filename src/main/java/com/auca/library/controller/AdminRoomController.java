@@ -16,11 +16,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
-import java.util.Map;
-import java.util.Date;
+
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
@@ -211,14 +209,14 @@ public ResponseEntity<QRCodeGenerationResponse> generateRoomQR(@PathVariable Lon
     }
 }
 
-// Fixed helper method - change return type to match usage
-private QRCodeGenerationResponse createQRErrorResponse(String message) {
-    QRCodeGenerationResponse errorResponse = new QRCodeGenerationResponse();
-    errorResponse.setSuccess(false);
-    errorResponse.setErrorMessage(message);
-    // errorResponse.setTimestamp(new Date().toString());
-    return errorResponse;
-}
+// // Fixed helper method - change return type to match usage
+// private QRCodeGenerationResponse createQRErrorResponse(String message) {
+//     QRCodeGenerationResponse errorResponse = new QRCodeGenerationResponse();
+//     errorResponse.setSuccess(false);
+//     errorResponse.setErrorMessage(message);
+//     // errorResponse.setTimestamp(new Date().toString());
+//     return errorResponse;
+// }
 
 
 

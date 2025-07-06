@@ -1,20 +1,21 @@
 package com.auca.library.controller;
 
-import com.auca.library.dto.response.EquipmentResponse;
-import com.auca.library.dto.response.LabClassResponse;
-import com.auca.library.dto.response.CourseResponse;
-import com.auca.library.model.Course;
-import com.auca.library.service.ProfessorService;
-import jakarta.validation.Valid;
-import com.auca.library.service.EquipmentService;
-import com.auca.library.service.LabClassService;
-import com.auca.library.service.CourseService;
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.*;
-import java.util.List;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.auca.library.dto.response.CourseResponse;
+import com.auca.library.dto.response.EquipmentResponse;
+import com.auca.library.dto.response.LabClassResponse;
+import com.auca.library.service.CourseService;
+import com.auca.library.service.EquipmentService;
+import com.auca.library.service.LabClassService;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController

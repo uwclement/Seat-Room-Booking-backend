@@ -82,4 +82,11 @@ public class EquipmentRequestController {
         MessageResponse response = equipmentRequestService.hodReviewEscalation(requestId, request, authentication.getName());
         return ResponseEntity.ok(response);
     }
+
+    @GetMapping("/current-month")
+    @PreAuthorize("hasRole('EQUIPMENT_ADMIN')")
+    public ResponseEntity<List<EquipmentRequestResponse>> getCurrentMonthRequests() {
+        List<EquipmentRequestResponse> requests = equipmentRequestService.getCurrentMonthRequests();
+      return ResponseEntity.ok(requests);
+    }
 }

@@ -54,7 +54,7 @@ public class BookingController {
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<MessageResponse> cancelBooking(@PathVariable Long id) {
         BookingDTO booking = bookingService.cancelBooking(id);
-        return ResponseEntity.ok(new MessageResponse("Booking cancelled successfully"));
+        return ResponseEntity.ok(new MessageResponse("Booking cancelled successfully" + booking ));
     }
     
     @PostMapping("/{id}/checkin")

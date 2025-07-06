@@ -34,7 +34,7 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
 public class QRCodeGenerationService {
 
     // @Value("${qr.base-url:http://localhost:3000}")
-    @Value("${qr.base-url:http://192.168.1.66:3000}")
+    @Value("${qr.base-url:http://192.168.1.65:3000}")
     private String baseUrl;
 
     @Value("${qr.generation.size:300}")
