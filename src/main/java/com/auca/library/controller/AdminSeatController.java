@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
 import com.auca.library.dto.request.BulkSeatUpdateRequest;
 import com.auca.library.dto.request.QRBulkGenerationRequest;
 import com.auca.library.dto.response.BulkQRGenerationResponse;
@@ -26,10 +25,8 @@ import com.auca.library.dto.response.QRCodeGenerationResponse;
 import com.auca.library.dto.response.SeatDTO;
 import com.auca.library.service.AdminQRCodeService;
 import com.auca.library.service.SeatService;
-
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
-
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
@@ -81,6 +78,12 @@ public class AdminSeatController {
     @PutMapping("/{id}/toggle-desktop")
     public ResponseEntity<SeatDTO> toggleDesktop(@PathVariable Long id) {
         return ResponseEntity.ok(seatService.toggleDesktopProperty(id));
+    }
+
+    // bulk toggle dektop
+    @PutMapping("/bulk-toggle-desktop")
+    public ResponseEntity<List<SeatDTO>> bulkToggleDesktop(@RequestBody Set<Long> seatIds) {
+       return ResponseEntity.ok(seatService.bulkToggleDesktop(seatIds));
     }
 
     // Disable seats for maintenance

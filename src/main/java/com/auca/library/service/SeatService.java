@@ -1,11 +1,21 @@
 package com.auca.library.service;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+
 import com.auca.library.dto.request.BulkSeatUpdateRequest;
 import com.auca.library.dto.request.SeatAvailabilityRequest;
 import com.auca.library.dto.response.SeatDTO;
 import com.auca.library.exception.ResourceNotFoundException;
 import com.auca.library.model.Booking;
-import com.auca.library.model.QRCodeLog;
 import com.auca.library.model.Seat;
 import com.auca.library.model.User;
 import com.auca.library.repository.BookingRepository;
@@ -15,17 +25,6 @@ import com.auca.library.repository.UserRepository;
 import com.auca.library.repository.WaitListRepository;
 
 import jakarta.transaction.Transactional;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 public class SeatService {
@@ -321,6 +320,28 @@ public class SeatService {
         LocalDateTime now = LocalDateTime.now();
         return mapSeatToDTO(seat, now, now.plusHours(1));
     }
+
+    @Transactional
+public List<SeatDTO> bulkToggleDesktop(Set<Long> seatIds) {
+    List<Seat> seats = seatRepository.findAllById(seatIds);
+    
+    if (seats.size() != seatIds.size()) {
+        Set<Long> foundIds = seats.stream().map(Seat::getId).collect(Collectors.toSet());
+        Set<Long> missingIds = seatIds.stream()
+                .filter(id -> !foundIds.contains(id))
+                .collect(Collectors.toSet());
+        throw new ResourceNotFoundException("Could not find seats with IDs: " + missingIds);
+    }
+    
+    // Toggle desktop for each seat
+    seats.forEach(seat -> seat.setHasDesktop(!seat.isHasDesktop()));
+    seats = seatRepository.saveAll(seats);
+    
+    LocalDateTime now = LocalDateTime.now();
+    return seats.stream()
+            .map(seat -> mapSeatToDTO(seat, now, now.plusHours(1)))
+            .collect(Collectors.toList());
+}
     
     @Transactional
     public List<SeatDTO> disableSeats(Set<Long> seatIds, boolean disabled) {

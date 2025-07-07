@@ -1,5 +1,6 @@
 package com.auca.library.service;
 
+import com.auca.library.controller.AdminQRCodeController.QRBulkDownloadRequest;
 import com.auca.library.dto.request.QRBulkGenerationRequest;
 import com.auca.library.dto.response.*;
 import com.auca.library.exception.ResourceNotFoundException;
@@ -16,8 +17,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -183,78 +186,99 @@ public class AdminQRCodeService {
         
         return response;
     }
+    
 
-    /**
-     * Bulk generate QR codes for seats
-     */
-    @Transactional
-    public BulkQRGenerationResponse bulkGenerateSeatQRCodes(QRBulkGenerationRequest request, String adminEmail) {
-        User admin = userRepository.findByEmail(adminEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("Admin user not found"));
-        
-        BulkQRGenerationResponse response = new BulkQRGenerationResponse();
-        response.setStartTime(LocalDateTime.now());
-        
-        List<Long> successfulIds = new ArrayList<>();
-        List<String> errors = new ArrayList<>();
-        Map<String, byte[]> generatedQRCodes = new HashMap<>();
-        
-        List<Seat> seats;
-        if (request.getResourceIds() != null && !request.getResourceIds().isEmpty()) {
-            seats = seatRepository.findAllById(request.getResourceIds());
-        } else if (request.isGenerateForAll()) {
-            seats = seatRepository.findByIsDisabled(false);
-        } else if (request.isGenerateForMissing()) {
-            seats = seatRepository.findSeatsWithoutQRCode();
-        } else {
-            seats = new ArrayList<>();
-        }
-        
-        for (Seat seat : seats) {
-            try {
-                // Generate token and URL
-                String newToken = qrGenerationService.generateUniqueToken();
-                String qrUrl = qrGenerationService.generateSeatQRUrl(newToken);
-                
-                // Generate QR code image
-                byte[] qrImage = qrGenerationService.generateQRCodeImage(qrUrl, seat.getSeatNumber());
-                
-                // Save QR code image
-                String filename = qrGenerationService.generateAndSaveQRCode(qrUrl, "SEAT", seat.getSeatNumber());
-                String imagePath = qrStorageService.storeQRCode(qrImage, filename, "seat");
-                
-                // Update seat
-                seat.setQrCodeToken(newToken);
-                seat.setQrCodeUrl(qrUrl);
-                seat.setQrImagePath(imagePath);
-                seat.setQrGeneratedAt(LocalDateTime.now());
-                seat.setQrVersion(seat.getQrVersion() + 1);
-                seatRepository.save(seat);
-                
-                // Log generation
-                QRCodeLog log = new QRCodeLog("SEAT", seat.getId(), admin, newToken);
-                log.setGenerationReason("Bulk generation");
-                log.setQrVersion(seat.getQrVersion());
-                qrCodeLogRepository.save(log);
-                
-                successfulIds.add(seat.getId());
-                generatedQRCodes.put(seat.getSeatNumber() + ".png", qrImage);
-                
-            } catch (Exception e) {
-                errors.add("Failed to generate QR for seat " + seat.getSeatNumber() + ": " + e.getMessage());
-            }
-        }
-        
-        response.setEndTime(LocalDateTime.now());
-        response.setTotalRequested(seats.size());
-        response.setSuccessCount(successfulIds.size());
-        response.setFailureCount(errors.size());
-        response.setSuccessfulResourceIds(successfulIds);
-        response.setErrors(errors);
-        response.setGeneratedQRCodes(generatedQRCodes);
-        
-        return response;
+
+
+    // get seat for bulk selection 
+    private List<Seat> getSeatsForBulkGeneration(QRBulkGenerationRequest request) {
+    if (request.getResourceIds() != null && !request.getResourceIds().isEmpty()) {
+        // Specific seats requested
+        return seatRepository.findAllById(request.getResourceIds());
+    } else if (request.isGenerateForAll()) {
+        // All enabled seats
+        return seatRepository.findByIsDisabled(false);
+    } else if (request.isGenerateForMissing()) {
+        // Only seats without QR codes
+        return seatRepository.findSeatsWithoutQRCode();
+    } else {
+        return new ArrayList<>();
     }
+}
+
+    
+// bulk set QRcode generation
+@Transactional
+public BulkQRGenerationResponse bulkGenerateSeatQRCodes(QRBulkGenerationRequest request, String adminEmail) {
+    User admin = userRepository.findByEmail(adminEmail)
+            .orElseThrow(() -> new ResourceNotFoundException("Admin user not found"));
+    
+    BulkQRGenerationResponse response = new BulkQRGenerationResponse();
+    response.setStartTime(LocalDateTime.now());
+    
+    List<Long> successfulIds = new ArrayList<>();
+    List<String> errors = new ArrayList<>();
+    Map<String, byte[]> generatedQRCodes = new HashMap<>();
+    
+    List<Seat> seats = getSeatsForBulkGeneration(request);
+    
+    for (Seat seat : seats) {
+        try {
+            // SIMPLE LOGIC: If regenerateExisting is true, always generate
+            // If false, only generate if no QR image path exists
+            boolean shouldGenerate = request.isRegenerateExisting() || 
+                                   seat.getQrImagePath() == null || 
+                                   seat.getQrImagePath().trim().isEmpty();
+            
+            if (!shouldGenerate) {
+                continue; // Skip this seat
+            }
+            
+            // Generate QR code (same logic as before)
+            String newToken = qrGenerationService.generateUniqueToken();
+            String qrUrl = qrGenerationService.generateSeatQRUrl(newToken);
+            byte[] qrImage = qrGenerationService.generateQRCodeImage(qrUrl, seat.getSeatNumber());
+            String filename = qrGenerationService.generateAndSaveQRCode(qrUrl, "SEAT", seat.getSeatNumber());
+            String imagePath = qrStorageService.storeQRCode(qrImage, filename, "seat");
+            
+            // Update seat
+            seat.setQrCodeToken(newToken);
+            seat.setQrCodeUrl(qrUrl);
+            seat.setQrImagePath(imagePath);
+            seat.setQrGeneratedAt(LocalDateTime.now());
+            seat.setQrVersion(seat.getQrVersion() != null ? seat.getQrVersion() + 1 : 1);
+            seatRepository.save(seat);
+            
+            // Log generation
+            QRCodeLog log = new QRCodeLog("SEAT", seat.getId(), admin, newToken);
+            log.setGenerationReason("Bulk generation");
+            log.setQrVersion(seat.getQrVersion());
+            qrCodeLogRepository.save(log);
+            
+            successfulIds.add(seat.getId());
+            
+            // Store for download if requested
+            if (request.isGenerateAndDownload()) {
+                generatedQRCodes.put(seat.getSeatNumber() + "_QR.png", qrImage);
+            }
+            
+        } catch (Exception e) {
+            errors.add("Failed to generate QR for seat " + seat.getSeatNumber() + ": " + e.getMessage());
+        }
+    }
+    
+    response.setEndTime(LocalDateTime.now());
+    response.setTotalRequested(seats.size());
+    response.setSuccessCount(successfulIds.size());
+    response.setFailureCount(errors.size());
+    response.setSuccessfulResourceIds(successfulIds);
+    response.setErrors(errors);
+    response.setGeneratedQRCodes(generatedQRCodes);
+    response.setDownloadAvailable(request.isGenerateAndDownload() && !generatedQRCodes.isEmpty());
+    response.setDownloadMessage(response.getSuccessCount() + " QR codes generated successfully");
+    
+    return response;
+}
 
     /**
      * Bulk generate QR codes for rooms
@@ -328,6 +352,9 @@ public class AdminQRCodeService {
         return response;
     }
 
+
+    
+
     /**
      * Download QR code image
      */
@@ -370,30 +397,117 @@ public class AdminQRCodeService {
                 .body(resource);
     }
 
+
     /**
-     * Download bulk QR codes as ZIP
-     */
-    public ResponseEntity<Resource> downloadBulkQRCodes(Map<String, byte[]> qrCodes, String type) throws IOException {
-        // Create ZIP file from QR codes
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        try (ZipOutputStream zos = new ZipOutputStream(baos)) {
-            for (Map.Entry<String, byte[]> entry : qrCodes.entrySet()) {
-                ZipEntry zipEntry = new ZipEntry(entry.getKey());
-                zos.putNextEntry(zipEntry);
-                zos.write(entry.getValue());
-                zos.closeEntry();
+ * Download selected QR codes as ZIP
+ */
+public ResponseEntity<Resource> downloadSelectedQRCodes(QRBulkDownloadRequest request) throws IOException {
+    Map<String, byte[]> qrCodes = new HashMap<>();
+    
+    if ("SEAT".equalsIgnoreCase(request.getType()) || "SEATS".equalsIgnoreCase(request.getType())) {
+        List<Seat> seats = getSeatsForDownload(request);
+        
+        for (Seat seat : seats) {
+            if (seat.getQrImagePath() != null && !seat.getQrImagePath().isEmpty()) {
+                try {
+                    byte[] qrImage = qrStorageService.retrieveQRCode(seat.getQrImagePath());
+                    qrCodes.put(seat.getSeatNumber() + "_QR.png", qrImage);
+                } catch (Exception e) {
+                    System.err.println("Failed to read QR code for seat " + seat.getSeatNumber() + ": " + e.getMessage());
+                    // Continue with other QR codes
+                }
             }
         }
         
-        byte[] zipBytes = baos.toByteArray();
-        ByteArrayResource resource = new ByteArrayResource(zipBytes);
+    } else if ("ROOM".equalsIgnoreCase(request.getType()) || "ROOMS".equalsIgnoreCase(request.getType())) {
+        List<Room> rooms = getRoomsForDownload(request);
         
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + type.toLowerCase() + "_qrcodes.zip\"")
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .contentLength(zipBytes.length)
-                .body(resource);
+        for (Room room : rooms) {
+            if (room.getQrImagePath() != null && !room.getQrImagePath().isEmpty()) {
+                try {
+                    byte[] qrImage = qrStorageService.retrieveQRCode(room.getQrImagePath());
+                    qrCodes.put(room.getRoomNumber() + "_QR.png", qrImage);
+                } catch (Exception e) {
+                    System.err.println("Failed to read QR code for room " + room.getRoomNumber() + ": " + e.getMessage());
+                    // Continue with other QR codes
+                }
+            }
+        }
+    } else {
+        throw new IllegalArgumentException("Invalid resource type: " + request.getType());
     }
+    
+    if (qrCodes.isEmpty()) {
+        throw new FileNotFoundException("No QR codes found for download");
+    }
+    
+    return createZipDownload(qrCodes, request.getType());
+}
+
+/**
+ * Get seats for download based on request
+ */
+private List<Seat> getSeatsForDownload(QRBulkDownloadRequest request) {
+    if (request.isDownloadAll()) {
+        return seatRepository.findByIsDisabled(false);
+    } else if (request.getResourceIds() != null && !request.getResourceIds().isEmpty()) {
+        return seatRepository.findAllById(request.getResourceIds());
+    } else {
+        return new ArrayList<>();
+    }
+}
+
+/**
+ * Get rooms for download based on request
+ */
+private List<Room> getRoomsForDownload(QRBulkDownloadRequest request) {
+    if (request.isDownloadAll()) {
+        return roomRepository.findByAvailableTrue();
+    } else if (request.getResourceIds() != null && !request.getResourceIds().isEmpty()) {
+        return roomRepository.findAllById(request.getResourceIds());
+    } else {
+        return new ArrayList<>();
+    }
+}
+
+/**
+ * Create ZIP file from QR codes map
+ */
+private ResponseEntity<Resource> createZipDownload(Map<String, byte[]> qrCodes, String type) throws IOException {
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    
+    try (ZipOutputStream zos = new ZipOutputStream(baos)) {
+        for (Map.Entry<String, byte[]> entry : qrCodes.entrySet()) {
+            ZipEntry zipEntry = new ZipEntry(entry.getKey());
+            zos.putNextEntry(zipEntry);
+            zos.write(entry.getValue());
+            zos.closeEntry();
+        }
+    }
+    
+    byte[] zipBytes = baos.toByteArray();
+    ByteArrayResource resource = new ByteArrayResource(zipBytes);
+    
+    String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+    String fileName = type.toLowerCase() + "_qrcodes_" + timestamp + ".zip";
+    
+    return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+            .contentType(MediaType.APPLICATION_OCTET_STREAM)
+            .contentLength(zipBytes.length)
+            .body(resource);
+}
+
+    
+     // Download bulk QR codes as ZIP
+     
+     public ResponseEntity<Resource> downloadBulkQRCodes(Map<String, byte[]> qrCodes, String type) throws IOException {
+    if (qrCodes.isEmpty()) {
+        throw new IOException("No QR codes available for download");
+    }
+    
+    return createZipDownload(qrCodes, type);
+}
 
     /**
      * Get QR code statistics

@@ -28,5 +28,13 @@ public interface SeatRepository extends JpaRepository<Seat, Long> {
     
     @Query("SELECT s FROM Seat s WHERE s.qrImagePath IS NULL AND s.isDisabled = false")
     List<Seat> findSeatsWithoutQRCode();
+
+
+    @Query("SELECT s FROM Seat s WHERE s.isDisabled = false")
+    List<Seat> findAllEnabledSeats();
+
+
+    @Query("SELECT s FROM Seat s WHERE s.qrImagePath IS NOT NULL AND s.isDisabled = false")
+    List<Seat> findSeatsWithQRCodePath();
     
 }

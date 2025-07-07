@@ -107,9 +107,9 @@ public class QRScanController {
         }
     }
 
-    /**
-     * Process check-in after QR scan (requires authentication)
-     */
+    
+     // Process check-in after QR scan (requires authentication)
+    
     @PostMapping("/checkin")
     @Operation(
         summary = "Check in via QR code", 
@@ -214,9 +214,9 @@ public class QRScanController {
         }
     }
 
-    /**
- * Mobile app QR validation endpoint
- */
+    
+ // Mobile app QR validation endpoint
+ 
 @PostMapping("/validate")
 @Operation(
     summary = "Validate QR code for mobile check-in", 

@@ -6,6 +6,8 @@ import java.util.Set;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -18,6 +20,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -54,6 +57,11 @@ public class User {
     @Size(max = 120)
     private String password;
 
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private Location location;
+
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "user_roles", 
                joinColumns = @JoinColumn(name = "user_id"),
@@ -87,11 +95,20 @@ public class User {
     @JoinColumn(name = "approved_by_hod")
     private User approvedByHod;
 
-    public User(String fullName, String email, String studentId, String password) {
+    public User(String fullName, String email, String studentId, String password, Location location) {
         this.fullName = fullName;
         this.email = email;
         this.studentId = studentId;
         this.password = password;
+        this.location = location;
     }
     
+
+    public boolean belongsToLocation(Location location) {
+        return this.location != null && this.location.equals(location);
+    }
+    
+    public String getLocationDisplayName() {
+        return location != null ? location.getDisplayName() : "Unknown";
+    }
 }

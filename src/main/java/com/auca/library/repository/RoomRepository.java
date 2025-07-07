@@ -163,4 +163,11 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
     
     @Query("SELECT r FROM Room r WHERE r.qrImagePath IS NULL AND r.available = true")
     List<Room> findRoomsWithoutQRCode();
+
+
+    @Query("SELECT r FROM Room r WHERE r.available = true")
+    List<Room> findAllAvailableRooms();
+
+    @Query("SELECT r FROM Room r WHERE r.qrImagePath IS NOT NULL AND r.available = true")
+    List<Room> findRoomsWithQRCodePath();
 }
