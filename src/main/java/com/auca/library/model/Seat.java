@@ -7,12 +7,15 @@ import java.util.Set;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -29,6 +32,11 @@ public class Seat {
 
     @Column(nullable = false, unique = true)
     private String seatNumber;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private Location location;
 
     // Zone type: collaboration or silent
     @Column(nullable = false)
@@ -64,10 +72,29 @@ public class Seat {
     @ManyToMany(mappedBy = "favoriteSeats")
     private Set<User> favoritedBy = new HashSet<>();
 
-    public Seat(String seatNumber, String zoneType, boolean hasDesktop, String description) {
+    public Seat(String seatNumber, String zoneType, boolean hasDesktop, String description, Location location) {
         this.seatNumber = seatNumber;
         this.zoneType = zoneType;
         this.hasDesktop = hasDesktop;
         this.description = description;
+        this.location = location;
     }
+
+
+    public boolean belongsToLocation(Location location) {
+        return this.location.equals(location);
+    }
+
+
+    public String getLocationDisplayName() {
+        return location != null ? location.getDisplayName() : "Unknown";
+    }
+
+     public String getLocationAwareSeatNumber() {
+        if (location != null) {
+            return location.getCode() + "-" + seatNumber;
+        }
+        return seatNumber;
+    }
+    
 }

@@ -100,19 +100,28 @@ public class AdminQRCodeController {
             @Valid @RequestBody QRBulkGenerationRequest request,
             Authentication authentication) {
         
-        String adminEmail = authentication.getName();
-        BulkQRGenerationResponse response = adminQRCodeService.bulkGenerateSeatQRCodes(request, adminEmail);
-        
-        // If generateAndDownload is true, return downloadable ZIP
-        if (request.isGenerateAndDownload() && !response.getGeneratedQRCodes().isEmpty()) {
-            try {
-                return adminQRCodeService.downloadBulkQRCodes(response.getGeneratedQRCodes(), "SEATS");
-            } catch (IOException e) {
-                // Fall back to regular response if download fails
+        try {
+            String adminEmail = authentication.getName();
+            BulkQRGenerationResponse response = adminQRCodeService.bulkGenerateSeatQRCodes(request, adminEmail);
+            
+            // If generateAndDownload is true, return downloadable ZIP
+            if (request.isGenerateAndDownload() && 
+                !response.getGeneratedQRCodes().isEmpty()) {
+                try {
+                    return adminQRCodeService.downloadBulkQRCodes(response.getGeneratedQRCodes(), "SEATS");
+                } catch (Exception e) {
+                    // Fall back to regular response if download fails
+                    response.setDownloadAvailable(false);
+                    response.setDownloadMessage("QR codes generated but download failed: " + e.getMessage());
+                }
             }
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Bulk generation failed: " + e.getMessage());
         }
-        
-        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/generate/bulk/rooms")
@@ -126,19 +135,28 @@ public class AdminQRCodeController {
             @Valid @RequestBody QRBulkGenerationRequest request,
             Authentication authentication) {
         
-        String adminEmail = authentication.getName();
-        BulkQRGenerationResponse response = adminQRCodeService.bulkGenerateRoomQRCodes(request, adminEmail);
-        
-        // If generateAndDownload is true, return downloadable ZIP
-        if (request.isGenerateAndDownload() && !response.getGeneratedQRCodes().isEmpty()) {
-            try {
-                return adminQRCodeService.downloadBulkQRCodes(response.getGeneratedQRCodes(), "ROOMS");
-            } catch (IOException e) {
-                // Fall back to regular response if download fails
+        try {
+            String adminEmail = authentication.getName();
+            BulkQRGenerationResponse response = adminQRCodeService.bulkGenerateRoomQRCodes(request, adminEmail);
+            
+            // If generateAndDownload is true, return downloadable ZIP
+            if (request.isGenerateAndDownload() && 
+                !response.getGeneratedQRCodes().isEmpty()) {
+                try {
+                    return adminQRCodeService.downloadBulkQRCodes(response.getGeneratedQRCodes(), "ROOMS");
+                } catch (Exception e) {
+                    // Fall back to regular response if download fails
+                    response.setDownloadAvailable(false);
+                    response.setDownloadMessage("QR codes generated but download failed: " + e.getMessage());
+                }
             }
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Bulk generation failed: " + e.getMessage());
         }
-        
-        return ResponseEntity.ok(response);
     }
 
     // ========== QR CODE DOWNLOAD ==========
@@ -164,18 +182,33 @@ public class AdminQRCodeController {
     @PostMapping("/download/bulk")
     @Operation(summary = "Download multiple QR codes as ZIP", 
                description = "Download selected QR codes in a ZIP file")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "ZIP file with QR codes"),
+        @ApiResponse(responseCode = "400", description = "Invalid request"),
+        @ApiResponse(responseCode = "404", description = "No QR codes found"),
+        @ApiResponse(responseCode = "500", description = "Download failed")
+    })
     public ResponseEntity<Resource> downloadBulkQRCodes(
-            @RequestBody QRBulkDownloadRequest request) {
+            @Valid @RequestBody QRBulkDownloadRequest request) {
         
         try {
-            // Collect QR codes based on request
-            java.util.Map<String, byte[]> qrCodes = new java.util.HashMap<>();
+            // Validate request
+            if (request.getType() == null || request.getType().trim().isEmpty()) {
+                return ResponseEntity.badRequest().build();
+            }
             
-            // Add logic to collect QR codes based on request parameters
-            // This is a simplified version - you'd implement the actual collection logic
+            if (!request.isDownloadAll() && 
+                (request.getResourceIds() == null || request.getResourceIds().isEmpty())) {
+                return ResponseEntity.badRequest().build();
+            }
             
-            return adminQRCodeService.downloadBulkQRCodes(qrCodes, request.getType());
+            return adminQRCodeService.downloadSelectedQRCodes(request);
+            
         } catch (Exception e) {
+            if (e.getMessage().contains("not found")) {
+                return ResponseEntity.notFound().build();
+            }
+            System.err.println("Bulk download error: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }

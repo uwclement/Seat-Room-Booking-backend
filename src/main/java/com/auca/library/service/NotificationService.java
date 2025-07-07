@@ -1,16 +1,16 @@
 package com.auca.library.service;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.Map;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.io.IOException;
-import java.time.ZoneId;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import com.auca.library.dto.request.NotificationMessage;
-import com.auca.library.dto.response.LibraryStatusResponse;
 import com.auca.library.exception.ResourceNotFoundException;
 import com.auca.library.model.Notification;
 import com.auca.library.model.Seat;
@@ -163,9 +162,9 @@ public class NotificationService {
                 NotificationConstants.TYPE_WAITLIST);
     }
 
-    /**
-     * Send notification when a user doesn't show up for their booking
-     */
+    
+     // Send notification when a user doesn't show up for their booking
+     
     public void sendNoShowNotification(User user, String seatNumber, LocalDateTime startTime) {
         String message = String.format(
                 "Your booking for seat %s scheduled at %s has been cancelled because you did not check in within 20 minutes of the start time.",
@@ -179,9 +178,79 @@ public class NotificationService {
                 NotificationConstants.TYPE_NO_SHOW);
     }
 
-    /**
-     * Send library-wide information notification to all active users
-     */
+    // check-in confirmation 
+    public void sendCheckInConfirmation(User user, String seatNumber, LocalDateTime startTime, boolean isAdminAction) {
+    String message;
+    
+    if (isAdminAction) {
+        message = String.format(
+            "You have been checked in by an administrator for seat %s scheduled at %s. " +
+            "Have a productive session!",
+            seatNumber,
+            startTime.format(DateTimeFormatter.ofPattern("MMM dd, yyyy 'at' h:mm a"))
+        );
+    } else {
+        message = String.format(
+            "You have successfully checked in to seat %s scheduled at %s. " +
+            "Enjoy your study session!",
+            seatNumber,
+            startTime.format(DateTimeFormatter.ofPattern("MMM dd, yyyy 'at' h:mm a"))
+        );
+    }
+
+    addNotification(
+        user.getEmail(),
+        "Booking Check-In Confirmed",
+        message,
+        NotificationConstants.TYPE_LIBRARY_INFO
+    );
+}
+
+    public void sendBookingCancellationNotification(User user, String seatNumber, LocalDateTime startTime, 
+                                               String cancellationReason, boolean isAdminAction) {
+    String message;
+    String title;
+    
+    if (isAdminAction) {
+        title = "Booking Cancelled by Administrator";
+        message = String.format(
+            "Your booking for seat %s scheduled on %s has been cancelled by an administrator.\n\n" +
+            "Reason: %s\n\n" +
+            "If you have any questions, please contact the library administration. " +
+            "You can make a new booking through the system.",
+            seatNumber,
+            startTime.format(DateTimeFormatter.ofPattern("MMM dd, yyyy 'at' h:mm a")),
+            cancellationReason != null && !cancellationReason.trim().isEmpty() 
+                ? cancellationReason 
+                : "Administrative action required"
+        );
+    } else {
+        title = "Booking Cancelled";
+        message = String.format(
+            "Your booking for seat %s scheduled on %s has been cancelled.\n\n" +
+            "Reason: %s\n\n" +
+            "You can make a new booking through the system.",
+            seatNumber,
+            startTime.format(DateTimeFormatter.ofPattern("MMM dd, yyyy 'at' h:mm a")),
+            cancellationReason != null && !cancellationReason.trim().isEmpty() 
+                ? cancellationReason 
+                : "Booking cancelled"
+        );
+    }
+
+    addNotification(
+        user.getEmail(),
+        title,
+        message,
+        NotificationConstants.TYPE_LIBRARY_INFO
+    );
+}
+
+
+
+    
+     // Send library-wide information notification to all active users
+     
     @Transactional
     public void sendLibraryInfoNotification(String title, String message) {
         List<User> activeUsers = userRepository.findActiveUsers();

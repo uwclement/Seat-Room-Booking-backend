@@ -59,22 +59,74 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     List<Booking> findBySeatId(Long seatId);
 
 
-/**
- * Find bookings that started more than 20 minutes ago and haven't been checked in
- */
-@Query("SELECT b FROM Booking b WHERE b.startTime < :cutoffTime AND b.status = 'RESERVED' AND b.checkedIn = false")
-List<Booking> findNoShowBookings(@Param("cutoffTime") LocalDateTime cutoffTime, @Param("now") LocalDateTime now);
 
-/**
- * Find bookings that started between 10 and 19 minutes ago and haven't been checked in
- */
+// Find bookings that started more than 20 minutes ago and haven't been checked in
 
-@Query("SELECT b FROM Booking b WHERE " +
+    @Query("SELECT b FROM Booking b WHERE b.startTime < :cutoffTime AND b.status = 'RESERVED' AND b.checkedIn = false")
+    List<Booking> findNoShowBookings(@Param("cutoffTime") LocalDateTime cutoffTime, @Param("now") LocalDateTime now);
+
+
+ // Find bookings that started between 10 and 19 minutes ago and haven't been checked in
+
+   @Query("SELECT b FROM Booking b WHERE " +
        "b.checkedIn = false AND " +
        "b.warningSent = false AND " +
        "b.startTime BETWEEN :maxCutoff AND :warningCutoff")
-List<Booking> findBookingsNeedingWarning( @Param("warningCutoff") LocalDateTime warningCutoff, @Param("maxCutoff") LocalDateTime maxCutoff);
+   List<Booking> findBookingsNeedingWarning( @Param("warningCutoff") LocalDateTime warningCutoff, @Param("maxCutoff") LocalDateTime maxCutoff);
 
+
+
+  // Find bookings eligible for manual check-in (Reserved bookings within the check-in time window)
+ 
+
+@Query("SELECT b FROM Booking b WHERE b.status = :status AND " +
+       "b.startTime BETWEEN :earliestCheckIn AND :latestCheckIn " +
+       "ORDER BY b.startTime ASC")
+List<Booking> findBookingsEligibleForCheckIn(
+    @Param("earliestCheckIn") LocalDateTime earliestCheckIn,
+    @Param("latestCheckIn") LocalDateTime latestCheckIn,
+    @Param("status") BookingStatus status
+);
+
+
+ // Find bookings by status list
+@Query("SELECT b FROM Booking b WHERE b.status IN :statuses ORDER BY b.startTime ASC")
+List<Booking> findByStatusIn(@Param("statuses") List<BookingStatus> statuses);
+
+
+ // Find active bookings for today (for admin dashboard)
+
+@Query("SELECT b FROM Booking b WHERE b.startTime >= :startOfDay AND b.startTime < :endOfDay AND " +
+       "b.status IN :statuses ORDER BY b.startTime ASC")
+List<Booking> findTodaysActiveBookings(
+    @Param("startOfDay") LocalDateTime startOfDay,
+    @Param("endOfDay") LocalDateTime endOfDay,
+    @Param("statuses") List<BookingStatus> statuses
+);
+
+ // Count bookings by status for admin statistics
+
+@Query("SELECT b.status, COUNT(b) FROM Booking b WHERE b.startTime >= :startOfDay AND b.startTime < :endOfDay GROUP BY b.status")
+List<Object[]> countTodaysBookingsByStatus(
+    @Param("startOfDay") LocalDateTime startOfDay,
+    @Param("endOfDay") LocalDateTime endOfDay
+);
+
+
+@Query("SELECT b FROM Booking b WHERE b.startTime BETWEEN :startDateTime AND :endDateTime ORDER BY b.startTime ASC")
+List<Booking> findBookingsByDateRange(
+    @Param("startDateTime") LocalDateTime startDateTime,
+    @Param("endDateTime") LocalDateTime endDateTime
+);
+
+
+ // Find bookings by date (using LocalDateTime parameters)
+
+@Query("SELECT b FROM Booking b WHERE b.startTime >= :startOfDay AND b.startTime < :startOfNextDay ORDER BY b.startTime ASC")
+List<Booking> findBookingsByDate(
+    @Param("startOfDay") LocalDateTime startOfDay,
+    @Param("startOfNextDay") LocalDateTime startOfNextDay
+);
 
 }
 

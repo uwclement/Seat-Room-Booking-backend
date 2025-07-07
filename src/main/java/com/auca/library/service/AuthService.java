@@ -60,7 +60,7 @@ public class AuthService {
                 signUpRequest.getFullName(),
                 signUpRequest.getEmail(),
                 signUpRequest.getStudentId(),
-                encoder.encode(signUpRequest.getPassword())
+                encoder.encode(signUpRequest.getPassword()), null
         );
 
         Set<Role> roles = new HashSet<>();

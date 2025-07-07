@@ -1,8 +1,14 @@
 package com.auca.library.controller;
 
+import com.auca.library.dto.request.AdminCancellationRequest;
+import com.auca.library.dto.request.BulkCancellationRequest;
 import com.auca.library.dto.response.BookingResponse;
 import com.auca.library.dto.response.MessageResponse;
 import com.auca.library.service.AdminBookingService;
+import org.springframework.security.core.Authentication;
+import io.swagger.v3.oas.annotations.Operation;
+import jakarta.validation.Valid;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -59,4 +65,77 @@ public class AdminBookingController {
     public ResponseEntity<List<BookingResponse>> getBookingsBySeat(@PathVariable Long seatId) {
         return ResponseEntity.ok(adminBookingService.getBookingsBySeat(seatId));
     }
+
+
+ // Manual check-in by admin
+ 
+    @PostMapping("/{bookingId}/checkin")
+    @Operation(summary = "Manual check-in by admin", description = "Allow admin to manually check in a user for their booking")
+    public ResponseEntity<BookingResponse> manualCheckIn(
+          @PathVariable Long bookingId,
+          Authentication authentication) {
+          String adminEmail = authentication.getName();
+          BookingResponse response = adminBookingService.manualCheckIn(bookingId, adminEmail);
+        return ResponseEntity.ok(response);
+    }
+
+
+
+ // Manual cancellation by admin with optional reason
+
+   @DeleteMapping("/{bookingId}/cancel")
+   @Operation(summary = "Manual cancellation by admin", description = "Allow admin to cancel any booking with optional reason")
+    public ResponseEntity<BookingResponse> manualCancelBooking(
+          @PathVariable Long bookingId,
+          @RequestBody(required = false) AdminCancellationRequest request,
+          Authentication authentication) {
+    
+          String adminEmail = authentication.getName();
+          String reason = (request != null) ? request.getReason() : null;
+    
+         BookingResponse response = adminBookingService.manualCancelBooking(bookingId, reason, adminEmail);
+        return ResponseEntity.ok(response);
+    }
+
+
+    
+ // Bulk cancellation by admin
+ 
+    @PostMapping("/bulk-cancel")
+    @Operation(summary = "Bulk cancel bookings", description = "Cancel multiple bookings at once with optional reason")
+    public ResponseEntity<AdminBookingService.BulkCancellationResponse> bulkCancelBookings(
+        @Valid @RequestBody BulkCancellationRequest request,
+        Authentication authentication) {
+    
+      String adminEmail = authentication.getName();
+      AdminBookingService.BulkCancellationResponse response = adminBookingService.bulkCancelBookings(
+        request.getBookingIds(), 
+        request.getReason(), 
+        adminEmail
+    );
+    return ResponseEntity.ok(response);
+    }
+
+
+
+     // Get bookings eligible for manual check-in
+
+    @GetMapping("/eligible-checkin")
+    @Operation(summary = "Get check-in eligible bookings", description = "Get bookings that can be manually checked in")
+    public ResponseEntity<List<BookingResponse>> getBookingsEligibleForCheckIn() {
+        List<BookingResponse> bookings = adminBookingService.getBookingsEligibleForCheckIn();
+        return ResponseEntity.ok(bookings);
+   }
+
+
+ // Get bookings eligible for cancellation
+
+    @GetMapping("/eligible-cancellation")
+    @Operation(summary = "Get cancellation eligible bookings", description = "Get bookings that can be cancelled")
+    public ResponseEntity<List<BookingResponse>> getBookingsEligibleForCancellation() {
+        List<BookingResponse> bookings = adminBookingService.getBookingsEligibleForCancellation();
+        return ResponseEntity.ok(bookings);
+    }
+
+
 }
