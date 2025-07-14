@@ -21,7 +21,7 @@ public class LibraryAnnouncementController {
 
     // Create new announcement (admin only)
     @PostMapping("/api/admin/announcements")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('LIBRARIAN')")
     public ResponseEntity<LibraryAnnouncementResponse> createAnnouncement(
             @Valid @RequestBody LibraryAnnouncementRequest request) {
         return ResponseEntity.ok(announcementService.createAnnouncement(request));
@@ -29,21 +29,21 @@ public class LibraryAnnouncementController {
 
     // Get all announcements (admin only)
     @GetMapping("/api/admin/announcements")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('LIBRARIAN')")
     public ResponseEntity<List<LibraryAnnouncementResponse>> getAllAnnouncements() {
         return ResponseEntity.ok(announcementService.getAllAnnouncements());
     }
 
     // Get announcement by ID (admin only)
     @GetMapping("/api/admin/announcements/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('LIBRARIAN')")
     public ResponseEntity<LibraryAnnouncementResponse> getAnnouncementById(@PathVariable Long id) {
         return ResponseEntity.ok(announcementService.getAnnouncementById(id));
     }
 
     // Update announcement (admin only)
     @PutMapping("/api/admin/announcements/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('LIBRARIAN')")
     public ResponseEntity<LibraryAnnouncementResponse> updateAnnouncement(
             @PathVariable Long id,
             @Valid @RequestBody LibraryAnnouncementRequest request) {
@@ -52,7 +52,7 @@ public class LibraryAnnouncementController {
 
     // Delete announcement (admin only)
     @DeleteMapping("/api/admin/announcements/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('LIBRARIAN')")
     public ResponseEntity<MessageResponse> deleteAnnouncement(@PathVariable Long id) {
         return ResponseEntity.ok(announcementService.deleteAnnouncement(id));
     }

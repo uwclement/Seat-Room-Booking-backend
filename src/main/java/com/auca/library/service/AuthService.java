@@ -1,7 +1,9 @@
 package com.auca.library.service;
 
 import com.auca.library.dto.request.LoginRequest;
+import com.auca.library.dto.request.PasswordChangeRequest;
 import com.auca.library.dto.request.SignupRequest;
+import com.auca.library.dto.request.StaffCreationRequest;
 import com.auca.library.dto.response.JwtResponse;
 import com.auca.library.dto.response.MessageResponse;
 import com.auca.library.exception.EmailAlreadyExistsException;
@@ -19,7 +21,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -44,6 +49,10 @@ public class AuthService {
     @Autowired
     private EmailService emailService;
 
+    private static final String DEFAULT_PASSWORD_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%";
+    private static final int DEFAULT_PASSWORD_LENGTH = 12;
+
+    // Student registration (self-registration)
     public MessageResponse registerUser(SignupRequest signUpRequest) throws EmailAlreadyExistsException, MessagingException {
         // Check if email exists
         if (userRepository.existsByEmail(signUpRequest.getEmail())) {
@@ -55,17 +64,18 @@ public class AuthService {
             throw new EmailAlreadyExistsException("Error: Student ID is already in use!");
         }
 
-        // Create new user's account
+        // Create new student account
         User user = new User(
                 signUpRequest.getFullName(),
                 signUpRequest.getEmail(),
                 signUpRequest.getStudentId(),
-                encoder.encode(signUpRequest.getPassword()), null
+                encoder.encode(signUpRequest.getPassword()),
+                signUpRequest.getLocation()
         );
 
         Set<Role> roles = new HashSet<>();
         
-        // By default, assign ROLE_USER
+        // By default, assign ROLE_USER for students
         Role userRole = roleRepository.findByName(Role.ERole.ROLE_USER)
                 .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
         roles.add(userRole);
@@ -92,9 +102,76 @@ public class AuthService {
         return new MessageResponse("User registered successfully! Please check your email to verify your account.");
     }
 
+    // Admin creates staff members
+    @Transactional
+    public MessageResponse createStaffUser(StaffCreationRequest request) throws EmailAlreadyExistsException {
+        // Check if email exists
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new EmailAlreadyExistsException("Error: Email is already in use!");
+        }
+
+        // Check if employee ID exists
+        if (userRepository.existsByEmployeeId(request.getEmployeeId())) {
+            throw new EmailAlreadyExistsException("Error: Employee ID is already in use!");
+        }
+
+        // Generate default password
+        String defaultPassword = generateDefaultPassword();
+
+        User user = new User(
+                request.getFullName(),
+                request.getEmail(),
+                request.getEmployeeId(),
+                encoder.encode(defaultPassword),
+                request.getLocation(),
+                request.getPhone()
+        );
+
+        // Set role based on request
+        Set<Role> roles = new HashSet<>();
+        Role.ERole roleEnum = Role.ERole.valueOf("ROLE_" + request.getRole().toUpperCase());
+        Role role = roleRepository.findByName(roleEnum)
+                .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
+        roles.add(role);
+        user.setRoles(roles);
+
+        // Set librarian based fields if applicable
+        if (roleEnum == Role.ERole.ROLE_LIBRARIAN) {
+            user.setWorkingDay(request.getWorkingDay());
+            user.setActiveToday(request.isActiveToday());
+            
+            // Handle default librarian logic
+            if (request.isDefault()) {
+                // Remove default status from existing default librarian
+                userRepository.findDefaultLibrarian().ifPresent(existing -> {
+                    existing.setIsDefault(false);
+                    userRepository.save(existing);
+                });
+                user.setIsDefault(true);
+            }
+
+            // Check active librarian limit
+            if (request.isActiveToday() && request.getWorkingDay() != null) {
+                long activeCount = userRepository.countActiveLibrariansForDay(request.getWorkingDay());
+                if (activeCount >= 2) {
+                    throw new IllegalStateException("Only 2 librarians can be active per day.");
+                }
+            }
+        }
+
+        userRepository.save(user);
+
+        return new MessageResponse("Staff member created successfully. Default password: " + defaultPassword);
+    }
+
+    // Universal login method
     public JwtResponse authenticateUser(LoginRequest loginRequest) {
+        // Find user by identifier (email, studentId, or employeeId)
+        User user = userRepository.findByIdentifier(loginRequest.getIdentifier())
+                .orElseThrow(() -> new RuntimeException("User not found with identifier: " + loginRequest.getIdentifier()));
+
         Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword()));
+                new UsernamePasswordAuthenticationToken(user.getEmail(), loginRequest.getPassword()));
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String jwt = jwtUtils.generateJwtToken(authentication);
@@ -104,16 +181,45 @@ public class AuthService {
                 .map(item -> item.getAuthority())
                 .collect(Collectors.toList());
 
+        String userType = user.isStudent() ? "STUDENT" : "STAFF";
+        String identifier = user.isStudent() ? user.getStudentId() : user.getEmployeeId();
+
         return new JwtResponse(
                 jwt, 
                 userDetails.getId(), 
                 userDetails.getFullName(),
                 userDetails.getEmail(),
-                userDetails.getStudentId(),
+                identifier,
+                userType,
                 userDetails.isEmailVerified(),
+                user.isMustChangePassword(),
                 roles);
     }
-    
+
+    // Password change method
+    @Transactional
+    public MessageResponse changePassword(Long userId, PasswordChangeRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Verify current password
+        if (!encoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new RuntimeException("Current password is incorrect");
+        }
+
+        // Verify new password confirmation
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new RuntimeException("New password and confirmation do not match");
+        }
+
+        // Update password
+        user.setPassword(encoder.encode(request.getNewPassword()));
+        user.setMustChangePassword(false);
+        userRepository.save(user);
+
+        return new MessageResponse("Password changed successfully");
+    }
+
     public MessageResponse verifyEmail(String token) {
         Optional<User> userOpt = userRepository.findByVerificationToken(token);
         
@@ -123,7 +229,7 @@ public class AuthService {
         
         User user = userOpt.get();
         user.setEmailVerified(true);
-        user.setVerificationToken(null); // Clear the token after use
+        user.setVerificationToken(null);
         userRepository.save(user);
         
         return new MessageResponse("Email verified successfully!");
@@ -131,5 +237,25 @@ public class AuthService {
     
     public boolean checkEmailExists(String email) {
         return userRepository.existsByEmail(email);
+    }
+
+    public boolean checkStudentIdExists(String studentId) {
+        return userRepository.existsByStudentId(studentId);
+    }
+
+    public boolean checkEmployeeIdExists(String employeeId) {
+        return userRepository.existsByEmployeeId(employeeId);
+    }
+
+    private String generateDefaultPassword() {
+        SecureRandom random = new SecureRandom();
+        StringBuilder password = new StringBuilder();
+        
+        for (int i = 0; i < DEFAULT_PASSWORD_LENGTH; i++) {
+            int randomIndex = random.nextInt(DEFAULT_PASSWORD_CHARS.length());
+            password.append(DEFAULT_PASSWORD_CHARS.charAt(randomIndex));
+        }
+        
+        return password.toString();
     }
 }

@@ -1,16 +1,16 @@
 package com.auca.library.dto.request;
 
+import com.auca.library.model.Location;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import com.auca.library.model.Location;
 import lombok.Data;
 
-import java.util.Set;
+import java.time.LocalDate;
 
 @Data
-public class SignupRequest {
+public class StaffCreationRequest {
     @NotBlank
     @Size(min = 3, max = 100)
     private String fullName;
@@ -22,14 +22,20 @@ public class SignupRequest {
 
     @NotBlank
     @Size(min = 3, max = 20)
-    private String studentId;
+    private String employeeId;
+
+    @NotBlank
+    @Size(max = 15)
+    private String phone;
 
     @NotNull
     private Location location;
 
     @NotBlank
-    @Size(min = 6, max = 40)
-    private String password;
+    private String role; // LIBRARIAN, ADMIN, EQUIPMENT_ADMIN, HOD
 
-    private Set<String> roles;
+    // Librarian based fields
+    private LocalDate workingDay;
+    private boolean activeToday = false;
+    private boolean isDefault = false;
 }

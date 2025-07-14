@@ -19,7 +19,7 @@ public class AvailabilityController {
     private AvailabilityService availabilityService;
 
     @GetMapping("/equipment/{equipmentId}")
-    @PreAuthorize("hasRole('PROFESSOR') or hasRole('USER') or hasRole('EQUIPMENT_ADMIN')")
+    @PreAuthorize("hasRole('PROFESSOR') or hasRole('USER') or hasRole('EQUIPMENT_ADMIN') or hasRole('LIBRARIAN')")
     public ResponseEntity<EquipmentAvailabilityResponse> getEquipmentAvailability(
             @PathVariable Long equipmentId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
@@ -31,7 +31,7 @@ public class AvailabilityController {
     }
 
     @GetMapping("/lab-class/{labClassId}")
-    @PreAuthorize("hasRole('PROFESSOR') or hasRole('EQUIPMENT_ADMIN')")
+    @PreAuthorize("hasRole('PROFESSOR') or hasRole('EQUIPMENT_ADMIN') or hasRole('LIBRARIAN')")
     public ResponseEntity<LabClassAvailabilityResponse> getLabClassAvailability(
             @PathVariable Long labClassId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,

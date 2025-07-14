@@ -85,7 +85,7 @@ public class RoomBookingController {
         @ApiResponse(responseCode = "409", description = "Booking conflict - room not available"),
         @ApiResponse(responseCode = "403", description = "User not authorized or booking limits exceeded")
     })
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('LIBRARIAN')")
     public ResponseEntity<RoomBookingResponse> createBooking(
             @Valid @RequestBody RoomBookingRequest request,
             Authentication authentication) {
@@ -103,7 +103,7 @@ public class RoomBookingController {
         @ApiResponse(responseCode = "403", description = "Not authorized to update this booking"),
         @ApiResponse(responseCode = "409", description = "Updated time conflicts with existing bookings")
     })
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('LIBRARIAN')")
     public ResponseEntity<RoomBookingResponse> updateBooking(
             @Parameter(description = "Booking ID") @PathVariable Long bookingId,
             @Valid @RequestBody BookingUpdateRequest request,
@@ -213,7 +213,7 @@ public ResponseEntity<List<InvitationResponse>> getMyPendingInvitations(
 
     @GetMapping("/rooms/{roomId}/availability")
     @Operation(summary = "Get real-time room availability", description = "Get current availability and upcoming slots for a room")
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('LIBRARIAN')")
     public ResponseEntity<RoomAvailabilityResponse> getRoomAvailability(
             @Parameter(description = "Room ID") @PathVariable Long roomId) {
         
@@ -223,7 +223,7 @@ public ResponseEntity<List<InvitationResponse>> getMyPendingInvitations(
 
     @GetMapping("/rooms/{roomId}/weekly-availability")
     @Operation(summary = "Get weekly room availability", description = "Get weekly calendar view of room availability")
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('LIBRARIAN')")
     public ResponseEntity<WeeklyRoomAvailabilityResponse> getWeeklyAvailability(
             @Parameter(description = "Room ID") @PathVariable Long roomId,
             @Parameter(description = "Week start date (defaults to current week)")
@@ -242,7 +242,7 @@ public ResponseEntity<List<InvitationResponse>> getMyPendingInvitations(
 
     @GetMapping("/rooms/all-availability")
     @Operation(summary = "Get all rooms availability", description = "Get real-time availability for all rooms")
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('LIBRARIAN')")
     public ResponseEntity<List<RoomAvailabilityResponse>> getAllRoomsAvailability() {
         List<RoomAvailabilityResponse> responses = roomAvailabilityService.getAllRoomsAvailability();
         return ResponseEntity.ok(responses);
@@ -252,7 +252,7 @@ public ResponseEntity<List<InvitationResponse>> getMyPendingInvitations(
 
     @PostMapping("/{bookingId}/participants/invite")
     @Operation(summary = "Invite participants to booking", description = "Invite additional participants to an existing booking")
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('LIBRARIAN')")
     public ResponseEntity<MessageResponse> inviteParticipants(
             @Parameter(description = "Booking ID") @PathVariable Long bookingId,
             @Valid @RequestBody InviteParticipantsRequest request,
@@ -265,7 +265,7 @@ public ResponseEntity<List<InvitationResponse>> getMyPendingInvitations(
 
     @PostMapping("/{bookingId}/participants/{participantId}/respond")
     @Operation(summary = "Respond to booking invitation", description = "Accept or decline a booking invitation")
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('LIBRARIAN')")
     public ResponseEntity<MessageResponse> respondToInvitation(
             @Parameter(description = "Booking ID") @PathVariable Long bookingId,
             @Parameter(description = "Participant ID") @PathVariable Long participantId,
@@ -279,7 +279,7 @@ public ResponseEntity<List<InvitationResponse>> getMyPendingInvitations(
 
     @DeleteMapping("/{bookingId}/participants/{participantId}")
     @Operation(summary = "Remove participant from booking", description = "Remove a participant from booking (owner only)")
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('LIBRARIAN')")
     public ResponseEntity<MessageResponse> removeParticipant(
             @Parameter(description = "Booking ID") @PathVariable Long bookingId,
             @Parameter(description = "Participant ID") @PathVariable Long participantId,
@@ -294,7 +294,7 @@ public ResponseEntity<List<InvitationResponse>> getMyPendingInvitations(
 
     @GetMapping("/{bookingId}/recurring-series")
     @Operation(summary = "Get recurring series information", description = "Get information about the recurring booking series")
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('LIBRARIAN')")
     public ResponseEntity<RecurringBookingSeriesResponse> getRecurringSeries(
             @Parameter(description = "Booking ID") @PathVariable Long bookingId,
             Authentication authentication) {
@@ -306,7 +306,7 @@ public ResponseEntity<List<InvitationResponse>> getMyPendingInvitations(
 
     @DeleteMapping("/{bookingId}/recurring-series")
     @Operation(summary = "Cancel entire recurring series", description = "Cancel all future bookings in the recurring series")
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('LIBRARIAN')")
     public ResponseEntity<MessageResponse> cancelRecurringSeries(
             @Parameter(description = "Booking ID") @PathVariable Long bookingId,
             Authentication authentication) {
@@ -320,7 +320,7 @@ public ResponseEntity<List<InvitationResponse>> getMyPendingInvitations(
 
     @GetMapping("/search")
     @Operation(summary = "Search bookings", description = "Search bookings with various filters")
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('LIBRARIAN')")
     public ResponseEntity<List<RoomBookingResponse>> searchBookings(
             @Parameter(description = "Search keyword") @RequestParam(required = false) String keyword,
             @Parameter(description = "Room ID") @RequestParam(required = false) Long roomId,
@@ -350,7 +350,7 @@ public ResponseEntity<List<InvitationResponse>> getMyPendingInvitations(
 
     @GetMapping("/quick-book/{roomId}")
     @Operation(summary = "Quick book available slot", description = "Find and book the next available slot for a room")
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('LIBRARIAN')")
     public ResponseEntity<RoomBookingResponse> quickBook(
             @Parameter(description = "Room ID") @PathVariable Long roomId,
             @Parameter(description = "Duration in hours") @RequestParam(defaultValue = "1") int durationHours,
@@ -363,7 +363,7 @@ public ResponseEntity<List<InvitationResponse>> getMyPendingInvitations(
 
     @PostMapping("/{bookingId}/extend")
     @Operation(summary = "Extend booking duration", description = "Extend an active booking if room is available")
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('LIBRARIAN')")
     public ResponseEntity<RoomBookingResponse> extendBooking(
             @Parameter(description = "Booking ID") @PathVariable Long bookingId,
             @Valid @RequestBody ExtendBookingRequest request,
@@ -378,7 +378,7 @@ public ResponseEntity<List<InvitationResponse>> getMyPendingInvitations(
 
     @GetMapping("/my-stats")
     @Operation(summary = "Get user booking statistics", description = "Get personal booking statistics and usage patterns")
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('LIBRARIAN')")
     public ResponseEntity<UserBookingStatsResponse> getMyStats(
             @Parameter(description = "Number of weeks to analyze") @RequestParam(defaultValue = "4") int weeks,
             Authentication authentication) {

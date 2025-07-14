@@ -35,6 +35,7 @@ public class Role {
         ROLE_ADMIN,
         ROLE_EQUIPMENT_ADMIN, 
         ROLE_PROFESSOR,      
-        ROLE_HOD 
+        ROLE_HOD, 
+        ROLE_LIBRARIAN
     }
 }

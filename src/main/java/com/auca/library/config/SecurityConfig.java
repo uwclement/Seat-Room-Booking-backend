@@ -67,12 +67,29 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> 
                 auth.requestMatchers("/api/auth/**").permitAll()
+                    .requestMatchers("/api/auth/signin").permitAll()
+                    .requestMatchers("/api/auth/signup").permitAll()
+                    .requestMatchers("/api/auth/verify").permitAll()
+                    .requestMatchers("/api/auth/check-email").permitAll()
+                    .requestMatchers("/api/auth/check-student-id").permitAll()
+                    .requestMatchers("/api/auth/check-employee-id").permitAll()
                     .requestMatchers("/api/test/**").permitAll()
                     .requestMatchers("/api/notifications/stream").permitAll()
                     .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                     .requestMatchers("api/scan/**").permitAll()
                     .requestMatchers("api/scan/info").permitAll()
                     .requestMatchers("/api/qr/image/**").permitAll()
+                    // Admin-only endpoints
+                    .requestMatchers("/api/auth/create-staff").hasRole("ADMIN")
+                    .requestMatchers("/api/users/staff/**").hasRole("ADMIN")
+                    .requestMatchers("/api/users/admins").hasRole("ADMIN")
+                    .requestMatchers("/api/users/equipment-admin").hasRole("ADMIN")
+                    .requestMatchers("/api/users/hod").hasRole("ADMIN")
+                    // Staff management endpoints
+                    .requestMatchers("/api/users/librarians/**").hasAnyRole("ADMIN", "LIBRARIAN")
+                    .requestMatchers("/api/users/professors/**").hasAnyRole("ADMIN", "HOD")
+                    // Password change endpoint (all authenticated users)
+                    .requestMatchers("/api/auth/change-password").hasAnyRole("USER", "ADMIN", "LIBRARIAN", "PROFESSOR", "HOD", "EQUIPMENT_ADMIN")
                     .anyRequest().authenticated()
             );
         
@@ -85,8 +102,8 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000"));
-        configuration.setAllowedOrigins(Arrays.asList("http://192.168.1.70:3000"));
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000"));
+        // configuration.setAllowedOrigins(Arrays.asList("http://192.168.1.70:3000"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("authorization", "content-type", "x-auth-token"));
         configuration.setExposedHeaders(Arrays.asList("x-auth-token"));

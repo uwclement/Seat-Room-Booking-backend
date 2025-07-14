@@ -29,14 +29,12 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/admin/qr")
 @CrossOrigin(origins = "*", maxAge = 3600)
-@PreAuthorize("hasRole('ADMIN')")
-@Tag(name = "Admin QR Code Management", description = "Administrative endpoints for QR code generation and management")
+@PreAuthorize("hasRole('ADMIN') or hasRole('LIBRARIAN') ")
 public class AdminQRCodeController {
 
     @Autowired

@@ -9,4 +9,6 @@ public class SeatDetailsResponse {
     private String zoneType;
     private boolean hasDesktop;
     private String description;
+    private String location;
+    private Integer floar;
 }

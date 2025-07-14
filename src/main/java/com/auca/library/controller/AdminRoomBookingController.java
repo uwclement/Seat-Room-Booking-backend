@@ -28,7 +28,7 @@ import jakarta.validation.Valid;
 @RestController
 @RequestMapping("/api/admin/Roombookings")
 @CrossOrigin(origins = "*", maxAge = 3600)
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('ADMIN') or hasRole('LIBRARIAN')")
 @Tag(name = "Admin Room Booking Management", description = "Enhanced admin operations for room bookings")
 public class AdminRoomBookingController {
 

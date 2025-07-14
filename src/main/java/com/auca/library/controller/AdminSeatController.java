@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
 import com.auca.library.dto.request.BulkSeatUpdateRequest;
 import com.auca.library.dto.request.QRBulkGenerationRequest;
 import com.auca.library.dto.response.BulkQRGenerationResponse;
@@ -25,13 +26,14 @@ import com.auca.library.dto.response.QRCodeGenerationResponse;
 import com.auca.library.dto.response.SeatDTO;
 import com.auca.library.service.AdminQRCodeService;
 import com.auca.library.service.SeatService;
+
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
 @RequestMapping("/api/admin/seats")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('ADMIN')  or hasRole('LIBRARIAN') ")
 public class AdminSeatController {
 
     @Autowired

@@ -1,16 +1,14 @@
 package com.auca.library.dto.request;
 
+import com.auca.library.model.Location;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import com.auca.library.model.Location;
 import lombok.Data;
 
-import java.util.Set;
-
 @Data
-public class SignupRequest {
+public class StudentUpdateRequest {
     @NotBlank
     @Size(min = 3, max = 100)
     private String fullName;
@@ -26,10 +24,4 @@ public class SignupRequest {
 
     @NotNull
     private Location location;
-
-    @NotBlank
-    @Size(min = 6, max = 40)
-    private String password;
-
-    private Set<String> roles;
 }

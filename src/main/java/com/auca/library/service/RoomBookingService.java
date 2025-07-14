@@ -501,7 +501,7 @@ private UserResponse mapUserToResponse(User user) {
     response.setId(user.getId());
     response.setFullName(user.getFullName());
     response.setEmail(user.getEmail());
-    response.setStudentId(user.getStudentId()); // Make sure User entity has this field
+    response.setIdentifier(user.getIdentifier()); // Make sure User entity has this field
     response.setEmailVerified(user.isEmailVerified()); // Make sure User entity has this field
     
     // Map roles to List<String>

@@ -224,8 +224,6 @@ public BulkQRGenerationResponse bulkGenerateSeatQRCodes(QRBulkGenerationRequest 
     
     for (Seat seat : seats) {
         try {
-            // SIMPLE LOGIC: If regenerateExisting is true, always generate
-            // If false, only generate if no QR image path exists
             boolean shouldGenerate = request.isRegenerateExisting() || 
                                    seat.getQrImagePath() == null || 
                                    seat.getQrImagePath().trim().isEmpty();
@@ -234,7 +232,7 @@ public BulkQRGenerationResponse bulkGenerateSeatQRCodes(QRBulkGenerationRequest 
                 continue; // Skip this seat
             }
             
-            // Generate QR code (same logic as before)
+            // Generate QR code
             String newToken = qrGenerationService.generateUniqueToken();
             String qrUrl = qrGenerationService.generateSeatQRUrl(newToken);
             byte[] qrImage = qrGenerationService.generateQRCodeImage(qrUrl, seat.getSeatNumber());
@@ -280,77 +278,111 @@ public BulkQRGenerationResponse bulkGenerateSeatQRCodes(QRBulkGenerationRequest 
     return response;
 }
 
-    /**
-     * Bulk generate QR codes for rooms
-     */
-    @Transactional
-    public BulkQRGenerationResponse bulkGenerateRoomQRCodes(QRBulkGenerationRequest request, String adminEmail) {
-        User admin = userRepository.findByEmail(adminEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("Admin user not found"));
-        
-        BulkQRGenerationResponse response = new BulkQRGenerationResponse();
-        response.setStartTime(LocalDateTime.now());
-        
-        List<Long> successfulIds = new ArrayList<>();
-        List<String> errors = new ArrayList<>();
-        Map<String, byte[]> generatedQRCodes = new HashMap<>();
-        
-        List<Room> rooms;
-        if (request.getResourceIds() != null && !request.getResourceIds().isEmpty()) {
-            rooms = roomRepository.findAllById(request.getResourceIds());
-        } else if (request.isGenerateForAll()) {
-            rooms = roomRepository.findByAvailableTrue();
-        } else if (request.isGenerateForMissing()) {
-            rooms = roomRepository.findRoomsWithoutQRCode();
-        } else {
-            rooms = new ArrayList<>();
-        }
-        
-        for (Room room : rooms) {
-            try {
-                // Generate token and URL
-                String newToken = qrGenerationService.generateUniqueToken();
-                String qrUrl = qrGenerationService.generateRoomQRUrl(newToken);
-                
-                // Generate QR code image
-                byte[] qrImage = qrGenerationService.generateQRCodeImage(qrUrl, room.getRoomNumber());
-                
-                // Save QR code image
-                String filename = qrGenerationService.generateAndSaveQRCode(qrUrl, "ROOM", room.getRoomNumber());
-                String imagePath = qrStorageService.storeQRCode(qrImage, filename, "room");
-                
-                // Update room
-                room.setQrCodeToken(newToken);
-                room.setQrCodeUrl(qrUrl);
-                room.setQrImagePath(imagePath);
-                room.setQrGeneratedAt(LocalDateTime.now());
-                room.setQrVersion(room.getQrVersion() + 1);
-                roomRepository.save(room);
-                
-                // Log generation
-                QRCodeLog log = new QRCodeLog("ROOM", room.getId(), admin, newToken);
-                log.setGenerationReason("Bulk generation");
-                log.setQrVersion(room.getQrVersion());
-                qrCodeLogRepository.save(log);
-                
-                successfulIds.add(room.getId());
-                generatedQRCodes.put(room.getRoomNumber() + ".png", qrImage);
-                
-            } catch (Exception e) {
-                errors.add("Failed to generate QR for room " + room.getRoomNumber() + ": " + e.getMessage());
-            }
-        }
-        
-        response.setEndTime(LocalDateTime.now());
-        response.setTotalRequested(rooms.size());
-        response.setSuccessCount(successfulIds.size());
-        response.setFailureCount(errors.size());
-        response.setSuccessfulResourceIds(successfulIds);
-        response.setErrors(errors);
-        response.setGeneratedQRCodes(generatedQRCodes);
-        
-        return response;
+
+ // get Room for bulk selection 
+  private List<Room> getRoomsForBulkGeneration(QRBulkGenerationRequest request) {
+    if (request.getResourceIds() != null && !request.getResourceIds().isEmpty()) {
+        // Specific rooms requested
+        return roomRepository.findAllById(request.getResourceIds());
+    } else if (request.isGenerateForAll()) {
+        // All available rooms
+        return roomRepository.findByAvailableTrue();
+    } else if (request.isGenerateForMissing()) {
+        // Only rooms without QR codes
+        return roomRepository.findRoomsWithoutQRCode();
+    } else {
+        return new ArrayList<>();
     }
+}
+
+    // bulkGenerateRoomQRCodes 
+@Transactional
+public BulkQRGenerationResponse bulkGenerateRoomQRCodes(QRBulkGenerationRequest request, String adminEmail) {
+    User admin = userRepository.findByEmail(adminEmail)
+            .orElseThrow(() -> new ResourceNotFoundException("Admin user not found"));
+    
+    BulkQRGenerationResponse response = new BulkQRGenerationResponse();
+    response.setStartTime(LocalDateTime.now());
+    
+    List<Long> successfulIds = new ArrayList<>();
+    List<String> errors = new ArrayList<>();
+    Map<String, byte[]> generatedQRCodes = new HashMap<>();
+    
+    List<Room> rooms = getRoomsForBulkGeneration(request);
+    
+    for (Room room : rooms) {
+        try {
+            boolean shouldGenerate = request.isRegenerateExisting() || 
+                                   room.getQrImagePath() == null || 
+                                   room.getQrImagePath().trim().isEmpty();
+            
+            if (!shouldGenerate) {
+                continue; // Skip this room
+            }
+            
+            // Generate QR code
+            String newToken = qrGenerationService.generateUniqueToken();
+            String qrUrl = qrGenerationService.generateRoomQRUrl(newToken);
+            byte[] qrImage = qrGenerationService.generateQRCodeImage(qrUrl, room.getRoomNumber());
+            String filename = qrGenerationService.generateAndSaveQRCode(qrUrl, "ROOM", room.getRoomNumber());
+            String imagePath = qrStorageService.storeQRCode(qrImage, filename, "room");
+            
+            // Update room
+            room.setQrCodeToken(newToken);
+            room.setQrCodeUrl(qrUrl);
+            room.setQrImagePath(imagePath);
+            room.setQrGeneratedAt(LocalDateTime.now());
+            room.setQrVersion(room.getQrVersion() != null ? room.getQrVersion() + 1 : 1);
+            roomRepository.save(room);
+            
+            // Log generation
+            QRCodeLog log = new QRCodeLog("ROOM", room.getId(), admin, newToken);
+            log.setGenerationReason("Bulk generation");
+            log.setQrVersion(room.getQrVersion());
+            qrCodeLogRepository.save(log);
+            
+            successfulIds.add(room.getId());
+            
+            // Store for download if requested
+            if (request.isGenerateAndDownload()) {
+                generatedQRCodes.put(room.getRoomNumber() + "_QR.png", qrImage);
+            }
+            
+        } catch (Exception e) {
+            errors.add("Failed to generate QR for room " + room.getRoomNumber() + ": " + e.getMessage());
+            e.printStackTrace(); // For debugging
+        }
+    }
+    
+    response.setEndTime(LocalDateTime.now());
+    response.setTotalRequested(rooms.size());
+    response.setSuccessCount(successfulIds.size());
+    response.setFailureCount(errors.size());
+    response.setSuccessfulResourceIds(successfulIds);
+    response.setErrors(errors);
+    response.setGeneratedQRCodes(generatedQRCodes);
+    response.setDownloadAvailable(request.isGenerateAndDownload() && !generatedQRCodes.isEmpty());
+    response.setDownloadMessage(response.getSuccessCount() + " QR codes generated successfully");
+    
+    return response;
+}
+
+// Helper method to check if QR should be generated for room
+private boolean shouldGenerateQRForRoom(Room room, QRBulkGenerationRequest request) {
+    // Always generate if regenerateExisting is true
+    if (request.isRegenerateExisting()) {
+        return true;
+    }
+    
+    if (room.getQrImagePath() == null || room.getQrImagePath().trim().isEmpty()) {
+        return true;
+    }
+    if (!qrStorageService.exists(room.getQrImagePath())) {
+        return true;
+    }
+    
+    return false;
+}
 
 
     

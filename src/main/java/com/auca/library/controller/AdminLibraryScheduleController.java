@@ -1,26 +1,37 @@
 package com.auca.library.controller;
 
-import com.auca.library.dto.request.RecurringClosureRequest;
-import com.auca.library.dto.response.LibraryClosureExceptionResponse;
-import com.auca.library.dto.response.LibraryScheduleResponse;
-import com.auca.library.dto.response.MessageResponse;
-import com.auca.library.service.LibraryScheduleService;
-import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
-
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.auca.library.dto.request.RecurringClosureRequest;
+import com.auca.library.dto.response.LibraryClosureExceptionResponse;
+import com.auca.library.dto.response.LibraryScheduleResponse;
+import com.auca.library.dto.response.MessageResponse;
+import com.auca.library.service.LibraryScheduleService;
+
+import jakarta.validation.Valid;
+
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
 @RequestMapping("/api/admin/schedule")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('ADMIN') or hasRole('LIBRARIAN') ")
 public class AdminLibraryScheduleController {
 
     @Autowired
