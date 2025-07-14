@@ -2,6 +2,8 @@ package com.auca.library.dto.response;
 
 import java.time.LocalDateTime;
 
+import com.auca.library.model.Location;
+
 import lombok.Data;
 
 @Data
@@ -11,6 +13,8 @@ public class SeatDTO {
     private String zoneType;
     private boolean hasDesktop;
     private String description;
+    private String location;
+    private Integer floar;
     private boolean isAvailable;
     private boolean isFavorite;
     private String nextAvailableTime; // For booked seats

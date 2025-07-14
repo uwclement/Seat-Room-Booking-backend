@@ -22,8 +22,8 @@ import lombok.Setter;
 
 @Entity
 @Table(name = "seats")
-@Getter
 @Setter
+@Getter
 @NoArgsConstructor
 public class Seat {
     @Id
@@ -50,6 +50,9 @@ public class Seat {
 
     private String description;
     
+    // floar number fo Masoro seats 
+    private Integer floar; 
+
      // QR CODE fields
     @Column(name = "qr_code_url")
     private String qrCodeUrl;
@@ -72,12 +75,13 @@ public class Seat {
     @ManyToMany(mappedBy = "favoriteSeats")
     private Set<User> favoritedBy = new HashSet<>();
 
-    public Seat(String seatNumber, String zoneType, boolean hasDesktop, String description, Location location) {
+    public Seat(String seatNumber, String zoneType, boolean hasDesktop, String description, Location location, Integer floar) {
         this.seatNumber = seatNumber;
         this.zoneType = zoneType;
         this.hasDesktop = hasDesktop;
         this.description = description;
         this.location = location;
+        this.floar= floar;
     }
 
 

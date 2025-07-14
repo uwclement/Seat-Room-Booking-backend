@@ -1,16 +1,24 @@
 package com.auca.library.controller;
 
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.auca.library.dto.request.SeatAvailabilityRequest;
 import com.auca.library.dto.response.MessageResponse;
 import com.auca.library.dto.response.SeatDTO;
 import com.auca.library.service.SeatService;
-import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import jakarta.validation.Valid;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
@@ -26,6 +34,23 @@ public class SeatController {
         List<SeatDTO> seats = seatService.getAllSeats();
         return ResponseEntity.ok(seats);
     }
+
+
+    @GetMapping("/Gishushu")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    public ResponseEntity<List<SeatDTO>> getSeatsInGishushu() {
+        List<SeatDTO> seats = seatService.getSeatsInGishushu();
+        return ResponseEntity.ok(seats);
+    }
+    
+
+     @GetMapping("/Masoro")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    public ResponseEntity<List<SeatDTO>> getSeatsInMasoro() {
+        List<SeatDTO> seats = seatService.getSeatsInMasoro();
+        return ResponseEntity.ok(seats);
+    }
+
     
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")

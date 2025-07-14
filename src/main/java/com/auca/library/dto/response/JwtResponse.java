@@ -11,18 +11,22 @@ public class JwtResponse {
     private Long id;
     private String fullName;
     private String email;
-    private String studentId;
+    private String identifier; 
+    private String userType; 
     private List<String> roles;
     private boolean emailVerified;
+    private boolean mustChangePassword;
 
-    public JwtResponse(String accessToken, Long id, String fullName, String email, String studentId, 
-                      boolean emailVerified, List<String> roles) {
+    public JwtResponse(String accessToken, Long id, String fullName, String email, String identifier, 
+                      String userType, boolean emailVerified, boolean mustChangePassword, List<String> roles) {
         this.token = accessToken;
         this.id = id;
         this.fullName = fullName;
         this.email = email;
-        this.studentId = studentId;
+        this.identifier = identifier;
+        this.userType = userType;
         this.emailVerified = emailVerified;
+        this.mustChangePassword = mustChangePassword;
         this.roles = roles;
     }
 }

@@ -17,7 +17,9 @@ public class UserDetailsImpl implements UserDetails {
     private Long id;
     private String fullName;
     private String email;
-    private String studentId;
+    private String identifier; 
+    private String userType; 
+    private boolean mustChangePassword;
 
     @JsonIgnore
     private String password;
@@ -26,14 +28,17 @@ public class UserDetailsImpl implements UserDetails {
 
     private Collection<? extends GrantedAuthority> authorities;
 
-    public UserDetailsImpl(Long id, String fullName, String email, String studentId, String password, 
-                           boolean emailVerified, Collection<? extends GrantedAuthority> authorities) {
+    public UserDetailsImpl(Long id, String fullName, String email, String identifier, String userType,
+                           String password, boolean emailVerified, boolean mustChangePassword,
+                           Collection<? extends GrantedAuthority> authorities) {
         this.id = id;
         this.fullName = fullName;
         this.email = email;
-        this.studentId = studentId;
+        this.identifier = identifier;
+        this.userType = userType;
         this.password = password;
         this.emailVerified = emailVerified;
+        this.mustChangePassword = mustChangePassword;
         this.authorities = authorities;
     }
 
@@ -42,13 +47,18 @@ public class UserDetailsImpl implements UserDetails {
                 .map(role -> new SimpleGrantedAuthority(role.getName().name()))
                 .collect(Collectors.toList());
 
+        String userType = user.isStudent() ? "STUDENT" : "STAFF";
+        String identifier = user.isStudent() ? user.getStudentId() : user.getEmployeeId();
+
         return new UserDetailsImpl(
                 user.getId(),
                 user.getFullName(),
                 user.getEmail(),
-                user.getStudentId(),
+                identifier,
+                userType,
                 user.getPassword(),
                 user.isEmailVerified(),
+                user.isMustChangePassword(),
                 authorities);
     }
 
@@ -69,12 +79,20 @@ public class UserDetailsImpl implements UserDetails {
         return email;
     }
 
-    public String getStudentId() {
-        return studentId;
+    public String getIdentifier() {
+        return identifier;
+    }
+
+    public String getUserType() {
+        return userType;
     }
     
     public boolean isEmailVerified() {
         return emailVerified;
+    }
+
+    public boolean isMustChangePassword() {
+        return mustChangePassword;
     }
 
     @Override
@@ -84,7 +102,7 @@ public class UserDetailsImpl implements UserDetails {
 
     @Override
     public String getUsername() {
-        return email;
+        return email; // Spring Security uses this for authentication
     }
 
     @Override

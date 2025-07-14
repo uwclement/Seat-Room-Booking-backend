@@ -16,6 +16,7 @@ import com.auca.library.dto.request.SeatAvailabilityRequest;
 import com.auca.library.dto.response.SeatDTO;
 import com.auca.library.exception.ResourceNotFoundException;
 import com.auca.library.model.Booking;
+import com.auca.library.model.Location;
 import com.auca.library.model.Seat;
 import com.auca.library.model.User;
 import com.auca.library.repository.BookingRepository;
@@ -59,6 +60,21 @@ public class SeatService {
         List<Seat> seats = seatRepository.findByIsDisabled(false);
         return mapSeatsToSeatDTOs(seats, now, now.plusHours(1));
     }
+
+    public List<SeatDTO> getSeatsInMasoro() {
+        LocalDateTime now = LocalDateTime.now();
+        List<Seat> seats = seatRepository.findByIsDisabledFalseAndLocation(Location.MASORO);
+        return mapSeatsToSeatDTOs(seats, now, now.plusHours(1));
+    }
+
+
+    public List<SeatDTO> getSeatsInGishushu() {
+        LocalDateTime now = LocalDateTime.now();
+        List<Seat> seats = seatRepository.findByIsDisabledFalseAndLocation(Location.GISHUSHU);
+        return mapSeatsToSeatDTOs(seats, now, now.plusHours(1));
+    }
+
+
     
     public SeatDTO getSeatById(Long id) {
         LocalDateTime now = LocalDateTime.now();
@@ -174,6 +190,8 @@ public class SeatService {
         dto.setFavorite(isFavorite);
         dto.setNextAvailableTime(nextAvailableTime);
         dto.setWaitingCount(waitingCount);
+        dto.setLocation(seat.getLocation().name());
+        dto.setFloar(seat.getFloar());
         
         return dto;
     }

@@ -17,7 +17,7 @@ import lombok.Data;
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
 @RequestMapping("/api/admin/notifications")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('ADMIN') or hasRole('LIBRARIAN') ")
 public class AdminNotificationController {
 
     @Autowired
