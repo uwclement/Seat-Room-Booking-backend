@@ -41,6 +41,7 @@ public class RoomBookingRequest {
     // Participant invitations
     private List<String> invitedUserEmails;
     private List<Long> invitedUserIds;
+    private List<String> invitedUserIdentifiers; 
 
     // For recurring bookings
     private boolean isRecurring = false;

@@ -1,13 +1,13 @@
 package com.auca.library.dto.response;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Set;
+
 import com.auca.library.model.RoomBooking;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import lombok.Data;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Set;
 
 @Data
 public class RoomBookingResponse {
@@ -34,6 +34,7 @@ public class RoomBookingResponse {
     private List<BookingParticipantResponse> participants;
     private Integer checkedInCount;
     private Integer totalParticipants;
+    private List<String> invitedUserIdentifiers; 
     
     // Equipment
     private Set<EquipmentResponse> requestedEquipment;

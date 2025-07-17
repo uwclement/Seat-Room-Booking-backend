@@ -1,13 +1,5 @@
 package com.auca.library.service;
 
-import com.auca.library.dto.request.RoomBookingRequest;
-import com.auca.library.exception.BookingConflictException;
-import com.auca.library.exception.BookingLimitExceededException;
-import com.auca.library.model.*;
-import com.auca.library.repository.*;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -15,12 +7,36 @@ import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import com.auca.library.dto.request.RoomBookingRequest;
+import com.auca.library.exception.BookingConflictException;
+import com.auca.library.exception.BookingLimitExceededException;
+import com.auca.library.model.Role;
+import com.auca.library.model.Room;
+import com.auca.library.model.RoomBooking;
+import com.auca.library.model.User;
+import com.auca.library.repository.RecurringBookingSeriesRepository;
+import com.auca.library.repository.RoomBookingRepository;
+
 @Service
 public class BookingValidationService {
     
     @Autowired private RoomBookingRepository roomBookingRepository;
     @Autowired private LibraryScheduleService libraryScheduleService;
     @Autowired private RecurringBookingSeriesRepository recurringSeriesRepository;
+    
+    // CONFIGURABLE LIMITS - Add these to application.properties
+    @Value("${booking.limits.weekly.hours.student:50}")
+    private int studentWeeklyLimit;
+    
+    @Value("${booking.limits.weekly.hours.professor:50}")
+    private int professorWeeklyLimit;
+    
+    @Value("${booking.limits.weekly.hours.admin:999}")
+    private int adminWeeklyLimit;
     
     public void validateBookingRequest(RoomBookingRequest request, User user, Room room) {
         validateBookingTimes(request, room);
@@ -83,10 +99,11 @@ public class BookingValidationService {
         }
     }
     
+    // FIXED: Enhanced user booking limits with role-based limits
     private void validateUserBookingLimits(RoomBookingRequest request, User user, Room room) {
         LocalDate bookingDate = request.getStartTime().toLocalDate();
         
-        // Daily booking limit - FIXED: Convert LocalDate to LocalDateTime
+        // Daily booking limit
         Long dailyBookings = roomBookingRepository.countUserBookingsForDate(user, bookingDate.atStartOfDay());
         if (dailyBookings >= room.getMaxBookingsPerDay()) {
             throw new BookingLimitExceededException(
@@ -94,7 +111,7 @@ public class BookingValidationService {
             );
         }
         
-        // Weekly booking limit (3 hours total per week)
+        // FIXED: Role-based weekly booking limits
         LocalDateTime weekStart = getWeekStart(bookingDate);
         LocalDateTime weekEnd = weekStart.plusWeeks(1);
         
@@ -109,12 +126,31 @@ public class BookingValidationService {
         
         long requestedHours = ChronoUnit.HOURS.between(request.getStartTime(), request.getEndTime());
         
-        if (totalWeeklyHours + requestedHours > 3) {
+        // FIXED: Get appropriate weekly limit based on user role
+        int weeklyLimit = getWeeklyLimitForUser(user);
+        
+        if (totalWeeklyHours + requestedHours > weeklyLimit) {
             throw new BookingLimitExceededException(
-                String.format("Weekly booking limit of 3 hours exceeded. Current: %d hours, Requested: %d hours", 
-                totalWeeklyHours, requestedHours)
+                String.format("Weekly booking limit of %d hours exceeded. Current: %d hours, Requested: %d hours", 
+                weeklyLimit, totalWeeklyHours, requestedHours)
             );
         }
+    }
+    
+    // NEW: Role-based weekly limits
+    private int getWeeklyLimitForUser(User user) {
+        // Admin and Librarian - unlimited (or very high limit)
+        if (user.hasRole(Role.ERole.ROLE_ADMIN) || user.hasRole(Role.ERole.ROLE_LIBRARIAN)) {
+            return adminWeeklyLimit; // 999 hours (effectively unlimited)
+        }
+        
+        // Professor - higher limit
+        if (user.hasRole(Role.ERole.ROLE_PROFESSOR) || user.hasRole(Role.ERole.ROLE_HOD)) {
+            return professorWeeklyLimit; // 30 hours per week
+        }
+        
+        // Students - standard limit
+        return studentWeeklyLimit; // 20 hours per week
     }
     
     private void validateRoomCapacity(RoomBookingRequest request, Room room) {
@@ -126,16 +162,21 @@ public class BookingValidationService {
         }
     }
     
+    // UPDATED: More flexible booking window
     private void validateBookingWindow(RoomBookingRequest request) {
-        // Rolling weekly booking window - can only book within current week
         LocalDate bookingDate = request.getStartTime().toLocalDate();
-
-        LocalDateTime currentWeekStart = getWeekStart(LocalDate.now());
-        LocalDateTime currentWeekEnd = currentWeekStart.plusWeeks(1).minusDays(1); // Saturday
-
-        if (bookingDate.isBefore(currentWeekStart.toLocalDate()) || bookingDate.isAfter(currentWeekEnd.toLocalDate())) {
+        LocalDate today = LocalDate.now();
+        
+        // Can't book in the past
+        if (bookingDate.isBefore(today)) {
+            throw new BookingConflictException("Cannot book in the past");
+        }
+        
+        // UPDATED: Allow booking up to 2 weeks in advance (instead of current week only)
+        LocalDate maxBookingDate = today.plusWeeks(2);
+        if (bookingDate.isAfter(maxBookingDate)) {
             throw new BookingConflictException(
-                "Bookings can only be made within the current week (Sunday to Saturday)"
+                "Bookings can only be made up to 2 weeks in advance"
             );
         }
     }
@@ -144,14 +185,22 @@ public class BookingValidationService {
         if (request.isRecurring()) {
             // Check if user has reached recurring booking limit
             Long activeRecurringSeries = recurringSeriesRepository.countActiveSeriesForUser(user);
-            if (activeRecurringSeries >= 2) { // Max 2 recurring series per user
-                throw new BookingLimitExceededException("User has reached maximum recurring booking series limit");
+            int maxRecurringSeries = user.hasRole(Role.ERole.ROLE_ADMIN) ? 10 : 3; // Admins get more
+            
+            if (activeRecurringSeries >= maxRecurringSeries) {
+                throw new BookingLimitExceededException(
+                    String.format("User has reached maximum recurring booking series limit of %d", maxRecurringSeries)
+                );
             }
             
-            // Validate recurring booking duration (max 2 hours per session)
+            // UPDATED: Flexible recurring booking duration based on role
             long durationHours = ChronoUnit.HOURS.between(request.getStartTime(), request.getEndTime());
-            if (durationHours > 2) {
-                throw new BookingLimitExceededException("Recurring bookings cannot exceed 2 hours per session");
+            int maxRecurringHours = user.hasRole(Role.ERole.ROLE_PROFESSOR) ? 4 : 2; // Professors get longer sessions
+            
+            if (durationHours > maxRecurringHours) {
+                throw new BookingLimitExceededException(
+                    String.format("Recurring bookings cannot exceed %d hours per session", maxRecurringHours)
+                );
             }
         }
     }
