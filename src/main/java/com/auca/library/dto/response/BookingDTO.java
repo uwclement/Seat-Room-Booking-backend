@@ -1,9 +1,10 @@
 package com.auca.library.dto.response;
 
-import com.auca.library.model.Booking;
-import lombok.Data;
-
 import java.time.LocalDateTime;
+
+import com.auca.library.model.Booking;
+
+import lombok.Data;
 
 @Data
 public class BookingDTO {
@@ -11,6 +12,7 @@ public class BookingDTO {
     private Long userId;
     private String userName;
     private Long seatId;
+    private String studentId;
     private String seatNumber;
     private String zoneType;
     private LocalDateTime startTime;
