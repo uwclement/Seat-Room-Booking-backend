@@ -12,6 +12,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,7 +30,6 @@ import com.auca.library.dto.request.InviteParticipantsRequest;
 import com.auca.library.dto.request.JoinBookingRequest;
 import com.auca.library.dto.request.RoomBookingRequest;
 import com.auca.library.dto.response.BookingHistoryResponse;
-import com.auca.library.dto.response.BookingParticipantResponse;
 import com.auca.library.dto.response.InvitationResponse;
 import com.auca.library.dto.response.MessageResponse;
 import com.auca.library.dto.response.RecurringBookingSeriesResponse;
@@ -38,6 +38,7 @@ import com.auca.library.dto.response.RoomBookingResponse;
 import com.auca.library.dto.response.RoomResponse;
 import com.auca.library.dto.response.UserBookingStatsResponse;
 import com.auca.library.dto.response.WeeklyRoomAvailabilityResponse;
+import com.auca.library.exception.ResourceNotFoundException;
 import com.auca.library.service.AdminRoomService;
 import com.auca.library.service.RoomAvailabilityService;
 import com.auca.library.service.RoomBookingService;
@@ -388,13 +389,30 @@ public ResponseEntity<List<InvitationResponse>> getMyPendingInvitations(
         return ResponseEntity.ok(response);
     }
 
-    // // ========== ERROR HANDLING ==========
+    // // ========== Error and Exception Exception Handling ==========
 
-    // @ExceptionHandler(Exception.class)
-    // public ResponseEntity<ErrorResponse> handleException(Exception e) {
-    //     ErrorResponse error = new ErrorResponse();
-    //     error.setMessage("An error occurred: " + e.getMessage());
-    //     error.setTimestamp(LocalDateTime.now());
-    //     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
-    // }
+  // AException handlers at the bottom of your controller class
+ @ExceptionHandler(IllegalArgumentException.class)
+public ResponseEntity<MessageResponse> handleIllegalArgument(IllegalArgumentException e) {
+    MessageResponse errorResponse = new MessageResponse(e.getMessage());
+    return ResponseEntity.badRequest().body(errorResponse);
+}
+
+@ExceptionHandler(SecurityException.class)
+public ResponseEntity<MessageResponse> handleSecurity(SecurityException e) {
+    MessageResponse errorResponse = new MessageResponse(e.getMessage());
+    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
+}
+
+@ExceptionHandler(ResourceNotFoundException.class)
+public ResponseEntity<MessageResponse> handleNotFound(ResourceNotFoundException e) {
+    MessageResponse errorResponse = new MessageResponse(e.getMessage());
+    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+}
+
+@ExceptionHandler(Exception.class)
+public ResponseEntity<MessageResponse> handleGeneral(Exception e) {
+    MessageResponse errorResponse = new MessageResponse("An error occurred: " + e.getMessage());
+    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+}
 }
