@@ -374,47 +374,45 @@ private User findUserById(Long userId) {
                                List<String> emails, 
                                List<Long> userIds,
                                List<String> identifiers) {
-    // Invite by email
+    
+    // Invite by email - NO TRY-CATCH
     if (emails != null && !emails.isEmpty()) {
         emails.forEach(email -> {
-            try {
-                // Validate email format
-                if (!isValidEmail(email)) {
-                    throw new IllegalArgumentException("Invalid email format: " + email);
-                }
-                
-                User user = userRepository.findByEmail(email).orElse(null);
-                if (user == null) {
-                    throw new ResourceNotFoundException("User not found with email: " + email);
-                }
-                
-                // Validate and create invitation
-                validateAndCreateInvitation(booking, user);
-                
-            } catch (Exception e) {
-                // Log error but continue with other invitations
-                System.err.println("Failed to invite user with email " + email + ": " + e.getMessage());
+            if (!isValidEmail(email)) {
+                throw new IllegalArgumentException("Invalid email format: " + email);
             }
+            
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new ResourceNotFoundException("Student not found with email: " + email));
+            
+            validateAndCreateInvitation(booking, user);
         });
     }
     
-    // Invite by user ID
+    // Invite by user ID 
     if (userIds != null && !userIds.isEmpty()) {
         userIds.forEach(userId -> {
-            try {
-                User user = userRepository.findById(userId).orElse(null);
-                if (user == null) {
-                    throw new ResourceNotFoundException("User not found with ID: " + userId);
-                }
-                
-                // Validate and create invitation
-                validateAndCreateInvitation(booking, user);
-                
-            } catch (Exception e) {
-                System.err.println("Failed to invite user with ID " + userId + ": " + e.getMessage());
-            }
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Student not found with ID: " + userId));
+            
+            validateAndCreateInvitation(booking, user);
         });
     }
+    
+    // Invite by identifier 
+    if (identifiers != null && !identifiers.isEmpty()) {
+        identifiers.forEach(identifier -> {
+            if (identifier == null || identifier.trim().isEmpty()) {
+                throw new IllegalArgumentException("Invalid Student: " + identifier);
+            }
+            
+            User user = userRepository.findByIdentifier(identifier.trim())
+                    .orElseThrow(() -> new ResourceNotFoundException("Student not found with Id: " + identifier));
+            
+            validateAndCreateInvitation(booking, user);
+        });
+    }
+
     
     // Invite by identifier (studentId or employeeId)
     if (identifiers != null && !identifiers.isEmpty()) {
