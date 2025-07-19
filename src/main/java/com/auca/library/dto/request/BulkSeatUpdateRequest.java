@@ -1,7 +1,10 @@
 package com.auca.library.dto.request;
 
-import lombok.Data;
 import java.util.Set;
+
+import com.auca.library.model.Location;
+
+import lombok.Data;
 
 @Data
 public class BulkSeatUpdateRequest {
@@ -10,4 +13,6 @@ public class BulkSeatUpdateRequest {
     private Boolean hasDesktop;
     private Boolean isDisabled;
     private String description;
+    private Integer floar; 
+    private Location location;
 }

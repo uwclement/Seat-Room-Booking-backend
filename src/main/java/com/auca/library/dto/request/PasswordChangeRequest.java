@@ -13,7 +13,7 @@ public class PasswordChangeRequest {
     @Size(min = 6, max = 40)
     private String newPassword;
 
-    @NotBlank
-    @Size(min = 6, max = 40)
-    private String confirmPassword;
+    // @NotBlank
+    // @Size(min = 6, max = 40)
+    // private String confirmPassword;
 }

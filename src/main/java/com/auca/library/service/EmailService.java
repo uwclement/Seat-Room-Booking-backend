@@ -29,7 +29,7 @@ public class EmailService {
         helper.setTo(to);
         helper.setSubject("Verify your AUCA Library Account");
         
-        String verificationUrl = "http://localhost:8080/api/auth/verify?token=" + token;
+        String verificationUrl = "http://localhost:3000/verify?token=" + token;
         
         String content = "<html><body>"
                 + "<h2>AUCA Library Account Verification</h2>"

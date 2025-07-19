@@ -2,6 +2,7 @@ package com.auca.library.service;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -11,6 +12,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import com.auca.library.dto.request.BulkSeatCreationRequest;
 import com.auca.library.dto.request.BulkSeatUpdateRequest;
 import com.auca.library.dto.request.SeatAvailabilityRequest;
 import com.auca.library.dto.response.SeatDTO;
@@ -223,59 +225,130 @@ public class SeatService {
     }
 
       // Admin capabilities
+    // ================== READ OPERATIONS (Location-Aware) ==================
+    
+    public List<SeatDTO> getAllSeatsForAdmin(Location location) {
+        LocalDateTime now = LocalDateTime.now();
+        List<Seat> seats;
+        
+        if (location != null) {
+            seats = seatRepository.findByLocation(location);
+        } else {
+            seats = seatRepository.findAll();
+        }
+        
+        return seats.stream()
+                .map(seat -> mapSeatToDTO(seat, now, now.plusHours(1)))
+                .collect(Collectors.toList());
+    }
+    
+    public List<SeatDTO> getDisabledSeats(Location location) {
+        LocalDateTime now = LocalDateTime.now();
+        List<Seat> seats;
+        
+        if (location != null) {
+            seats = seatRepository.findByIsDisabledAndLocation(true, location);
+        } else {
+            seats = seatRepository.findByIsDisabled(true);
+        }
+        
+        return seats.stream()
+                .map(seat -> mapSeatToDTO(seat, now, now.plusHours(1)))
+                .collect(Collectors.toList());
+    }
+    
+    public SeatDTO getSeatById(Long id, Location userLocation) {
+        LocalDateTime now = LocalDateTime.now();
+        Seat seat = seatRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Seat not found with id: " + id));
+        
+        // Location-based access control
+        if (userLocation != null && !seat.belongsToLocation(userLocation)) {
+            throw new ResourceNotFoundException("You don't have access to this seat");
+        }
+        
+        return mapSeatToDTO(seat, now, now.plusHours(1));
+    }
+
+    // ================== CREATE OPERATION (Location-Aware) ==================
+    
     @Transactional
-    public SeatDTO createSeat(SeatDTO seatDTO) {
+    public SeatDTO createSeat(SeatDTO seatDTO, Location userLocation) {
         Seat seat = new Seat();
         seat.setSeatNumber(seatDTO.getSeatNumber());
         seat.setZoneType(seatDTO.getZoneType());
         seat.setHasDesktop(seatDTO.isHasDesktop());
         seat.setDescription(seatDTO.getDescription());
-        seat.setDisabled(false);
         
+        // Set location - librarians can only create seats in their location
+        if (userLocation != null) {
+            seat.setLocation(userLocation);
+        } else {
+            // Admin can specify location, defaults to location in DTO
+            seat.setLocation(Location.valueOf(seatDTO.getLocation()));
+        }
+        
+        // Set floor if provided
+        if (seatDTO.getFloar() != null) {
+            seat.setFloar(seatDTO.getFloar());
+        }
+        
+        seat.setDisabled(false);
         seat = seatRepository.save(seat);
 
+        // Generate QR Code
         try {
-        String token = qrGenerationService.generateUniqueToken();
-        String qrUrl = qrGenerationService.generateSeatQRUrl(token);
-        byte[] qrImage = qrGenerationService.generateQRCodeImage(qrUrl, seat.getSeatNumber());
-        String filename = qrGenerationService.generateAndSaveQRCode(qrUrl, "SEAT", seat.getSeatNumber());
-        String imagePath = qrStorageService.storeQRCode(qrImage, filename, "seat");
-        
-        seat.setQrCodeToken(token);
-        seat.setQrCodeUrl(qrUrl);
-        seat.setQrImagePath(imagePath);
-        seat.setQrGeneratedAt(LocalDateTime.now());
-        seat = seatRepository.save(seat);
-        
-        // Log QR generation
-        // QRCodeLog log = new QRCodeLog("SEAT", seat.getId(), getCurrentAdmin(), token);
-        // log.setGenerationReason("Auto-generated on creation");
-        // qrCodeLogRepository.save(log);
-        
-    } catch (Exception e) {
-        // Log error but don't fail seat creation
-        System.err.println("Failed to generate QR code for new seat: " + e.getMessage());
-    }
+            String token = qrGenerationService.generateUniqueToken();
+            String qrUrl = qrGenerationService.generateSeatQRUrl(token);
+            byte[] qrImage = qrGenerationService.generateQRCodeImage(qrUrl, seat.getSeatNumber());
+            String filename = qrGenerationService.generateAndSaveQRCode(qrUrl, "SEAT", seat.getSeatNumber());
+            String imagePath = qrStorageService.storeQRCode(qrImage, filename, "seat");
+            
+            seat.setQrCodeToken(token);
+            seat.setQrCodeUrl(qrUrl);
+            seat.setQrImagePath(imagePath);
+            seat.setQrGeneratedAt(LocalDateTime.now());
+            seat = seatRepository.save(seat);
+            
+        } catch (Exception e) {
+            System.err.println("Failed to generate QR code for new seat: " + e.getMessage());
+        }
 
         LocalDateTime now = LocalDateTime.now();
-        
         return mapSeatToDTO(seat, now, now.plusHours(1));
     }
+
+    // ================== UPDATE OPERATIONS (Location-Aware) ==================
     
     @Transactional
-    public SeatDTO updateSeat(Long id, SeatDTO seatDTO) {
+    public SeatDTO updateSeat(Long id, SeatDTO seatDTO, Location userLocation) {
         Seat seat = seatRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Seat not found with id: " + id));
         
+        // Location-based access control
+        if (userLocation != null && !seat.belongsToLocation(userLocation)) {
+            throw new ResourceNotFoundException("You don't have access to this seat");
+        }
+        
+        // Update fields
         if (seatDTO.getSeatNumber() != null) {
             seat.setSeatNumber(seatDTO.getSeatNumber());
         }
         if (seatDTO.getZoneType() != null) {
             seat.setZoneType(seatDTO.getZoneType());
         }
-        seat.setHasDesktop(seatDTO.isHasDesktop());
+        // if (seatDTO.isHasDesktop() != null) {
+        //     seat.setHasDesktop(seatDTO.isHasDesktop());
+        // }
         if (seatDTO.getDescription() != null) {
             seat.setDescription(seatDTO.getDescription());
+        }
+        if (seatDTO.getFloar() != null) {
+            seat.setFloar(seatDTO.getFloar());
+        }
+        // Only admins can change location
+        if (userLocation == null && seatDTO.getLocation() != null) {
+            seat.setLocation(Location.valueOf(seatDTO.getLocation()));
         }
         
         seat = seatRepository.save(seat);
@@ -285,15 +358,7 @@ public class SeatService {
     }
     
     @Transactional
-    public void deleteSeat(Long id) {
-        if (!seatRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Seat not found with id: " + id);
-        }
-        seatRepository.deleteById(id);
-    }
-    
-    @Transactional
-    public List<SeatDTO> bulkUpdateSeats(BulkSeatUpdateRequest bulkUpdateRequest) {
+    public List<SeatDTO> bulkUpdateSeats(BulkSeatUpdateRequest bulkUpdateRequest, Location userLocation) {
         List<Seat> seats = seatRepository.findAllById(bulkUpdateRequest.getSeatIds());
         
         if (seats.size() != bulkUpdateRequest.getSeatIds().size()) {
@@ -302,6 +367,17 @@ public class SeatService {
                     .filter(id -> !foundIds.contains(id))
                     .collect(Collectors.toSet());
             throw new ResourceNotFoundException("Could not find seats with IDs: " + missingIds);
+        }
+        
+        // Location-based access control for bulk operations
+        if (userLocation != null) {
+            List<Seat> unauthorizedSeats = seats.stream()
+                    .filter(seat -> !seat.belongsToLocation(userLocation))
+                    .collect(Collectors.toList());
+            
+            if (!unauthorizedSeats.isEmpty()) {
+                throw new ResourceNotFoundException("You don't have access to some of the selected seats");
+            }
         }
         
         seats.forEach(seat -> {
@@ -317,6 +393,13 @@ public class SeatService {
             if (bulkUpdateRequest.getDescription() != null) {
                 seat.setDescription(bulkUpdateRequest.getDescription());
             }
+            if (bulkUpdateRequest.getFloar() != null) {
+                seat.setFloar(bulkUpdateRequest.getFloar());
+            }
+            // Only admins can change location in bulk
+            if (userLocation == null && bulkUpdateRequest.getLocation() != null) {
+                seat.setLocation(bulkUpdateRequest.getLocation());
+            }
         });
         
         seats = seatRepository.saveAll(seats);
@@ -328,9 +411,14 @@ public class SeatService {
     }
     
     @Transactional
-    public SeatDTO toggleDesktopProperty(Long id) {
+    public SeatDTO toggleDesktopProperty(Long id, Location userLocation) {
         Seat seat = seatRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Seat not found with id: " + id));
+        
+        // Location-based access control
+        if (userLocation != null && !seat.belongsToLocation(userLocation)) {
+            throw new ResourceNotFoundException("You don't have access to this seat");
+        }
         
         seat.setHasDesktop(!seat.isHasDesktop());
         seat = seatRepository.save(seat);
@@ -340,29 +428,7 @@ public class SeatService {
     }
 
     @Transactional
-public List<SeatDTO> bulkToggleDesktop(Set<Long> seatIds) {
-    List<Seat> seats = seatRepository.findAllById(seatIds);
-    
-    if (seats.size() != seatIds.size()) {
-        Set<Long> foundIds = seats.stream().map(Seat::getId).collect(Collectors.toSet());
-        Set<Long> missingIds = seatIds.stream()
-                .filter(id -> !foundIds.contains(id))
-                .collect(Collectors.toSet());
-        throw new ResourceNotFoundException("Could not find seats with IDs: " + missingIds);
-    }
-    
-    // Toggle desktop for each seat
-    seats.forEach(seat -> seat.setHasDesktop(!seat.isHasDesktop()));
-    seats = seatRepository.saveAll(seats);
-    
-    LocalDateTime now = LocalDateTime.now();
-    return seats.stream()
-            .map(seat -> mapSeatToDTO(seat, now, now.plusHours(1)))
-            .collect(Collectors.toList());
-}
-    
-    @Transactional
-    public List<SeatDTO> disableSeats(Set<Long> seatIds, boolean disabled) {
+    public List<SeatDTO> bulkToggleDesktop(Set<Long> seatIds, Location userLocation) {
         List<Seat> seats = seatRepository.findAllById(seatIds);
         
         if (seats.size() != seatIds.size()) {
@@ -373,7 +439,18 @@ public List<SeatDTO> bulkToggleDesktop(Set<Long> seatIds) {
             throw new ResourceNotFoundException("Could not find seats with IDs: " + missingIds);
         }
         
-        seats.forEach(seat -> seat.setDisabled(disabled));
+        // Location-based access control
+        if (userLocation != null) {
+            List<Seat> unauthorizedSeats = seats.stream()
+                    .filter(seat -> !seat.belongsToLocation(userLocation))
+                    .collect(Collectors.toList());
+            
+            if (!unauthorizedSeats.isEmpty()) {
+                throw new ResourceNotFoundException("You don't have access to some of the selected seats");
+            }
+        }
+        
+        seats.forEach(seat -> seat.setHasDesktop(!seat.isHasDesktop()));
         seats = seatRepository.saveAll(seats);
         
         LocalDateTime now = LocalDateTime.now();
@@ -382,22 +459,138 @@ public List<SeatDTO> bulkToggleDesktop(Set<Long> seatIds) {
                 .collect(Collectors.toList());
     }
     
-    public List<SeatDTO> getDisabledSeats() {
-        LocalDateTime now = LocalDateTime.now();
-        List<Seat> seats = seatRepository.findByIsDisabled(true);
+    @Transactional
+    public List<SeatDTO> disableSeats(Set<Long> seatIds, boolean disabled, Location userLocation) {
+        List<Seat> seats = seatRepository.findAllById(seatIds);
         
-        return seats.stream()
-                .map(seat -> mapSeatToDTO(seat, now, now.plusHours(1)))
-                .collect(Collectors.toList());
-    }
-    
-    public List<SeatDTO> getAllSeatsForAdmin() {
-        LocalDateTime now = LocalDateTime.now();
-        List<Seat> seats = seatRepository.findAll();
+        if (seats.size() != seatIds.size()) {
+            Set<Long> foundIds = seats.stream().map(Seat::getId).collect(Collectors.toSet());
+            Set<Long> missingIds = seatIds.stream()
+                    .filter(id -> !foundIds.contains(id))
+                    .collect(Collectors.toSet());
+            throw new ResourceNotFoundException("Could not find seats with IDs: " + missingIds);
+        }
         
+        // Location-based access control
+        if (userLocation != null) {
+            List<Seat> unauthorizedSeats = seats.stream()
+                    .filter(seat -> !seat.belongsToLocation(userLocation))
+                    .collect(Collectors.toList());
+            
+            if (!unauthorizedSeats.isEmpty()) {
+                throw new ResourceNotFoundException("You don't have access to some of the selected seats");
+            }
+        }
+        
+        seats.forEach(seat -> seat.setDisabled(disabled));
+        seats = seatRepository.saveAll(seats);
+        
+        LocalDateTime now = LocalDateTime.now();
         return seats.stream()
                 .map(seat -> mapSeatToDTO(seat, now, now.plusHours(1)))
                 .collect(Collectors.toList());
     }
 
+    // ================== DELETE OPERATION (Location-Aware) ==================
+    
+    @Transactional
+    public void deleteSeat(Long id, Location userLocation) {
+        Seat seat = seatRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Seat not found with id: " + id));
+        
+        // Location-based access control
+        if (userLocation != null && !seat.belongsToLocation(userLocation)) {
+            throw new ResourceNotFoundException("You don't have access to this seat");
+        }
+        
+        seatRepository.deleteById(id);
+    }
+    
+    // Helper method to get current user's location from security context
+    private Location getCurrentUserLocation() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String currentUserEmail = authentication.getName();
+        
+        User user = userRepository.findByEmail(currentUserEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        
+        return user.isLibrarian() ? user.getLocation() : null;
+    }
+
+
+
+
+    // Bulk seat creation operation
+
+    @Transactional
+public List<SeatDTO> bulkCreateSeats(BulkSeatCreationRequest request, Location userLocation) {
+    // Location-based access control
+    Location targetLocation = userLocation != null ? userLocation : request.getLocation();
+    
+    if (userLocation != null && !userLocation.equals(request.getLocation())) {
+        throw new ResourceNotFoundException("You can only create seats in your location: " + userLocation);
+    }
+    
+    List<Seat> seatsToCreate = new ArrayList<>();
+    List<String> failedSeats = new ArrayList<>();
+    
+    // Generate seats from startNumber to endNumber
+    for (int i = request.getStartNumber(); i <= request.getEndNumber(); i++) {
+        String seatNumber = request.getSeatNumberPrefix() + String.format("%03d", i); // e.g., GS001, GS002
+        
+        // Check if seat number already exists
+        if (seatRepository.existsBySeatNumber(seatNumber)) {
+            failedSeats.add(seatNumber);
+            continue;
+        }
+        
+        Seat seat = new Seat();
+        seat.setSeatNumber(seatNumber);
+        seat.setZoneType(request.getZoneType());
+        seat.setHasDesktop(request.getHasDesktop());
+        seat.setDescription(request.getDescription());
+        seat.setLocation(targetLocation);
+        seat.setFloar(request.getFloar());
+        seat.setDisabled(false);
+        
+        seatsToCreate.add(seat);
+    }
+    
+    if (!failedSeats.isEmpty()) {
+        throw new IllegalArgumentException("Some seat numbers already exist: " + failedSeats);
+    }
+    
+    // Save all seats
+    List<Seat> savedSeats = seatRepository.saveAll(seatsToCreate);
+    
+    // Generate QR codes for all seats (optional - can be done later)
+    generateQRCodesForSeats(savedSeats);
+    
+    // Convert to DTOs
+    LocalDateTime now = LocalDateTime.now();
+    return savedSeats.stream()
+            .map(seat -> mapSeatToDTO(seat, now, now.plusHours(1)))
+            .collect(Collectors.toList());
+}
+
+private void generateQRCodesForSeats(List<Seat> seats) {
+    seats.parallelStream().forEach(seat -> {
+        try {
+            String token = qrGenerationService.generateUniqueToken();
+            String qrUrl = qrGenerationService.generateSeatQRUrl(token);
+            byte[] qrImage = qrGenerationService.generateQRCodeImage(qrUrl, seat.getSeatNumber());
+            String filename = qrGenerationService.generateAndSaveQRCode(qrUrl, "SEAT", seat.getSeatNumber());
+            String imagePath = qrStorageService.storeQRCode(qrImage, filename, "seat");
+            
+            seat.setQrCodeToken(token);
+            seat.setQrCodeUrl(qrUrl);
+            seat.setQrImagePath(imagePath);
+            seat.setQrGeneratedAt(LocalDateTime.now());
+            
+            seatRepository.save(seat);
+        } catch (Exception e) {
+            System.err.println("Failed to generate QR code for seat " + seat.getSeatNumber() + ": " + e.getMessage());
+        }
+    });
+}
 }

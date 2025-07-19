@@ -40,5 +40,15 @@ public interface SeatRepository extends JpaRepository<Seat, Long> {
 
     List<Seat> findByIsDisabledFalseAndLocation(Location location);
 
+    // Location-based queries
+    List<Seat> findByLocation(Location location);
+    List<Seat> findByIsDisabledAndLocation(boolean isDisabled, Location location);
+    List<Seat> findByLocationAndZoneType(Location location, String zoneType);
+    List<Seat> findByLocationAndHasDesktop(Location location, boolean hasDesktop);
     
+    
+    @Query("SELECT s FROM Seat s WHERE s.location = ?1 AND s.zoneType = ?2 AND s.hasDesktop = ?3")
+    List<Seat> findByLocationAndZoneTypeAndHasDesktop(Location location, String zoneType, boolean hasDesktop);
+
+    boolean existsBySeatNumber(String seatNumber);
 }

@@ -1,5 +1,22 @@
 package com.auca.library.service;
 
+import java.security.SecureRandom;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.auca.library.dto.request.LoginRequest;
 import com.auca.library.dto.request.PasswordChangeRequest;
 import com.auca.library.dto.request.SignupRequest;
@@ -13,20 +30,8 @@ import com.auca.library.repository.RoleRepository;
 import com.auca.library.repository.UserRepository;
 import com.auca.library.security.jwt.JwtUtils;
 import com.auca.library.security.services.UserDetailsImpl;
-import jakarta.mail.MessagingException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.security.SecureRandom;
-import java.time.LocalDate;
-import java.util.*;
-import java.util.stream.Collectors;
+import jakarta.mail.MessagingException;
 
 @Service
 public class AuthService {
@@ -201,15 +206,10 @@ public class AuthService {
     public MessageResponse changePassword(Long userId, PasswordChangeRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-
+                
         // Verify current password
         if (!encoder.matches(request.getCurrentPassword(), user.getPassword())) {
             throw new RuntimeException("Current password is incorrect");
-        }
-
-        // Verify new password confirmation
-        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
-            throw new RuntimeException("New password and confirmation do not match");
         }
 
         // Update password
