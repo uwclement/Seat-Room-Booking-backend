@@ -15,6 +15,7 @@ import com.auca.library.repository.UserRepository;
 import com.auca.library.repository.WaitListRepository;
 import jakarta.mail.MessagingException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -52,6 +53,10 @@ public class BookingService {
 
     @Autowired
     private LibraryScheduleService libraryScheduleService;
+     
+    @Autowired
+    private  NotificationService notificationService;
+    
 
     private static final int MAX_BOOKING_HOURS = 6;
 
@@ -404,6 +409,106 @@ public class BookingService {
                             + date.getDayOfWeek());
         }
     }
+
+
+    //extend based notification 
+
+    @Scheduled(fixedRate = 300000) // Run every 5 minutes
+@Transactional
+public void checkBookingsNearingEnd() {
+    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime tenMinutesFromNow = now.plusMinutes(10);
+    LocalDateTime fifteenMinutesFromNow = now.plusMinutes(15);
+    
+    // Find bookings ending in 10-15 minutes that haven't been notified
+    List<Booking> nearingEndBookings = bookingRepository.findBookingsNearingCompletion(
+        tenMinutesFromNow, fifteenMinutesFromNow);
+    
+    for (Booking booking : nearingEndBookings) {
+        if (!booking.isExtensionRequested()) {
+            // Mark as extension requested
+            booking.setExtensionRequested(true);
+            booking.setExtensionNotifiedAt(now);
+            bookingRepository.save(booking);
+            
+            // Send notifications
+            try {
+                // Send email notification
+                emailService.sendExtensionNotification(
+                    booking.getUser().getEmail(), 
+                    booking.getSeat().getSeatNumber(), 
+                    booking.getId()
+                );
+                
+                // Send app notification
+                notificationService.sendExtensionReminderNotification(
+                    booking.getUser(), 
+                    booking.getSeat().getSeatNumber(), 
+                    booking.getEndTime()
+                );
+            } catch (Exception e) {
+                System.err.println("Failed to send extension notification: " + e.getMessage());
+            }
+        }
+    }
+}   
+
+   @Transactional
+public BookingDTO extendBooking(Long bookingId, Integer additionalHours) {
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    String currentUserEmail = authentication.getName();
+
+    User user = userRepository.findByEmail(currentUserEmail)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+    Booking booking = bookingRepository.findById(bookingId)
+            .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+
+    // Validate user owns the booking
+    if (!booking.getUser().getId().equals(user.getId())) {
+        throw new BadRequestException("You don't have permission to extend this booking");
+    }
+
+    // Check if booking is checked in
+    if (booking.getStatus() != Booking.BookingStatus.CHECKED_IN) {
+        throw new BadRequestException("Only checked-in bookings can be extended");
+    }
+
+    // Check if booking is still active
+    LocalDateTime now = LocalDateTime.now();
+    if (booking.getEndTime().isBefore(now)) {
+        throw new BadRequestException("Cannot extend a booking that has already ended");
+    }
+
+    // Calculate new end time
+    LocalDateTime newEndTime = booking.getEndTime().plusHours(additionalHours);
+
+    // Validate against library hours
+    if (!libraryScheduleService.isLibraryOpenAt(newEndTime.toLocalDate(), newEndTime.toLocalTime())) {
+        throw new BadRequestException("Cannot extend booking beyond library operating hours");
+    }
+
+    // Check if seat is available for extension period (EXCLUDING current booking)
+    List<Booking> overlappingBookings = bookingRepository.findOverlappingBookings(
+        booking.getSeat().getId(), 
+        booking.getEndTime(), 
+        newEndTime
+    );
+    
+    // Remove the current booking from the list since we're extending it
+    overlappingBookings.removeIf(b -> b.getId().equals(bookingId));
+    
+    if (!overlappingBookings.isEmpty()) {
+        throw new BadRequestException("The seat is not available for the requested extension time");
+    }
+
+    // Update booking
+    booking.setEndTime(newEndTime);
+    booking.setExtended(true);
+    booking = bookingRepository.save(booking);
+
+    return mapBookingToDTO(booking);
+}
 
     private BookingDTO mapBookingToDTO(Booking booking) {
         BookingDTO dto = new BookingDTO();

@@ -489,4 +489,22 @@ public void sendEscalationNotification(String hodEmail, String professorName, St
     addNotification(hodEmail, title, message, "EQUIPMENT_ESCALATION");
 }
 
+
+// extend booking notification 
+
+public void sendExtensionReminderNotification(User user, String seatNumber, LocalDateTime endTime) {
+    String message = String.format(
+        "Your booking for seat %s is ending at %s. You can extend it from your bookings page.",
+        seatNumber,
+        endTime.format(DateTimeFormatter.ofPattern("h:mm a"))
+    );
+
+    addNotification(
+        user.getEmail(),
+        "Booking Ending Soon",
+        message,
+        NotificationConstants.TYPE_LIBRARY_INFO
+    );
+}
+
 }

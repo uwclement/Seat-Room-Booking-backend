@@ -1,6 +1,7 @@
 package com.auca.library.controller;
 
 import com.auca.library.dto.request.CreateBookingRequest;
+import com.auca.library.dto.request.ExtendBookingRequest;
 import com.auca.library.dto.request.ExtensionRequest;
 import com.auca.library.dto.response.BookingDTO;
 import com.auca.library.dto.response.MessageResponse;
@@ -77,4 +78,14 @@ public class BookingController {
         BookingDTO booking = bookingService.respondToExtension(request);
         return ResponseEntity.ok(booking);
     }
+
+
+    @PostMapping("/{id}/extend")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<BookingDTO> extendBooking(
+        @PathVariable Long id, 
+        @Valid @RequestBody ExtendBookingRequest request) {
+    BookingDTO booking = bookingService.extendBooking(id, request.getAdditionalHours());
+    return ResponseEntity.ok(booking);
+}
 }
