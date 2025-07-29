@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import com.auca.library.model.Booking;
 import com.auca.library.model.Location;
 
+
 import lombok.Data;
 
 @Data
@@ -14,6 +15,7 @@ public class BookingDTO {
     private String userName;
     private String identifier; 
     private Long seatId;
+    private String studentId;
     private String seatNumber;
     private String zoneType;
     private LocalDateTime startTime;

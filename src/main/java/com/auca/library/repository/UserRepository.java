@@ -111,4 +111,5 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // Staff with default passwords
     @Query("SELECT u FROM User u WHERE u.employeeId IS NOT NULL AND u.mustChangePassword = true")
     List<User> findStaffWithDefaultPasswords();
+    
 }

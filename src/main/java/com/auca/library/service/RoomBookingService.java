@@ -1,17 +1,5 @@
 package com.auca.library.service;
 
-import com.auca.library.dto.request.*;
-import com.auca.library.dto.response.*;
-import com.auca.library.exception.ResourceNotFoundException;
-import com.auca.library.exception.BookingConflictException;
-import com.auca.library.model.*;
-import com.auca.library.repository.*;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -24,6 +12,64 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.auca.library.dto.request.BookingSearchRequest;
+import com.auca.library.dto.request.BookingUpdateRequest;
+import com.auca.library.dto.request.ExtendBookingRequest;
+import com.auca.library.dto.request.InvitationResponseRequest;
+import com.auca.library.dto.request.InviteParticipantsRequest;
+import com.auca.library.dto.request.JoinBookingRequest;
+import com.auca.library.dto.request.RoomBookingRequest;
+import com.auca.library.dto.request.RoomSearchRequest;
+import com.auca.library.dto.response.AvailabilityGapResponse;
+import com.auca.library.dto.response.AvailableSlotResponse;
+import com.auca.library.dto.response.BookedRoomResponse;
+import com.auca.library.dto.response.BookingHistoryResponse;
+import com.auca.library.dto.response.BookingParticipantResponse;
+import com.auca.library.dto.response.CalendarBookingResponse;
+import com.auca.library.dto.response.CurrentBookingResponse;
+import com.auca.library.dto.response.DailyBookingTimelineResponse;
+import com.auca.library.dto.response.EquipmentResponse;
+import com.auca.library.dto.response.InvitationResponse;
+import com.auca.library.dto.response.MessageResponse;
+import com.auca.library.dto.response.NextAvailableSlotResponse;
+import com.auca.library.dto.response.RecurringBookingSeriesResponse;
+import com.auca.library.dto.response.RecurringSeriesStats;
+import com.auca.library.dto.response.RoomAvailabilityCalendarResponse;
+import com.auca.library.dto.response.RoomAvailabilityResponse;
+import com.auca.library.dto.response.RoomBookingResponse;
+import com.auca.library.dto.response.RoomBookingTimelineResponse;
+import com.auca.library.dto.response.RoomCalendarResponse;
+import com.auca.library.dto.response.RoomNextAvailableResponse;
+import com.auca.library.dto.response.RoomOccupancyResponse;
+import com.auca.library.dto.response.RoomResponse;
+import com.auca.library.dto.response.RoomUtilizationDashboardResponse;
+import com.auca.library.dto.response.RoomUtilizationSummary;
+import com.auca.library.dto.response.TimelineBookingResponse;
+import com.auca.library.dto.response.UpcomingBookingResponse;
+import com.auca.library.dto.response.UserBookingStatsResponse;
+import com.auca.library.dto.response.UserResponse;
+import com.auca.library.dto.response.WeeklyRoomAvailabilityResponse;
+import com.auca.library.exception.BookingConflictException;
+import com.auca.library.exception.ResourceNotFoundException;
+import com.auca.library.model.BookingParticipant;
+import com.auca.library.model.Equipment;
+import com.auca.library.model.RecurringBookingSeries;
+import com.auca.library.model.Role;
+import com.auca.library.model.Room;
+import com.auca.library.model.RoomBooking;
+import com.auca.library.model.RoomCategory;
+import com.auca.library.model.User;
+import com.auca.library.repository.BookingParticipantRepository;
+import com.auca.library.repository.EquipmentRepository;
+import com.auca.library.repository.RoomBookingRepository;
+import com.auca.library.repository.RoomRepository;
+import com.auca.library.repository.UserRepository;
 
 @Service
 public class RoomBookingService {
@@ -90,9 +136,15 @@ public class RoomBookingService {
         }
         
         // Send invitations
-        if (request.getInvitedUserEmails() != null || request.getInvitedUserIds() != null) {
-            inviteParticipants(booking, request.getInvitedUserEmails(), request.getInvitedUserIds());
-        }
+        if (request.getInvitedUserEmails() != null || 
+            request.getInvitedUserIds() != null || 
+            request.getInvitedUserIdentifiers() != null) {
+    
+    inviteParticipants(booking, 
+                      request.getInvitedUserEmails(), 
+                      request.getInvitedUserIds(),
+                      request.getInvitedUserIdentifiers()); 
+}
         
         // Send notifications
         sendBookingNotifications(booking);
@@ -150,26 +202,48 @@ public class RoomBookingService {
     }
     
     // Cancel booking
-    @Transactional
+      @Transactional
     public MessageResponse cancelBooking(Long bookingId, String userEmail) {
-        RoomBooking booking = findBookingById(bookingId);
-        User user = findUserByEmail(userEmail);
+      RoomBooking booking = findBookingById(bookingId);
+      User user = findUserByEmail(userEmail);
+    
+       if (!canUserCancelBooking(booking, user)) {
+        throw new SecurityException("User cannot cancel this booking");
+      }
+    
+      // Store participants for notification before deletion
+      List<BookingParticipant> participants = new ArrayList<>(booking.getParticipants());
+    
+      booking.setStatus(RoomBooking.BookingStatus.CANCELLED);
+    
+       // Delete all participants when booking is cancelled
+      if (!participants.isEmpty()) {
+        participantRepository.deleteAll(participants);
         
-        if (!canUserCancelBooking(booking, user)) {
-            throw new SecurityException("User cannot cancel this booking");
-        }
-        
-        booking.setStatus(RoomBooking.BookingStatus.CANCELLED);
-        roomBookingRepository.save(booking);
-        
-        // Notify participants
-        notifyParticipantsOfCancellation(booking);
-        
-        // Process waitlist
-        processWaitlistForCancellation(booking);
-        
-        return new MessageResponse("Booking cancelled successfully");
-    }
+        // Notify all participants
+        participants.forEach(participant -> {
+            notificationService.addNotification(
+                    participant.getUser().getEmail(),
+                    "Booking Cancelled",
+                    String.format("The booking '%s' has been cancelled", booking.getTitle()),
+                    "BOOKING_CANCELLED"
+            );
+        });
+      }
+     
+     roomBookingRepository.save(booking);
+    
+     // Process waitlist
+     processWaitlistForCancellation(booking);
+    
+      return new MessageResponse("Booking cancelled successfully");
+   }
+
+// Helper method to find user by ID
+private User findUserById(Long userId) {
+    return userRepository.findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+}
     
     // Check in to booking
     @Transactional
@@ -296,43 +370,141 @@ public class RoomBookingService {
         return conflicts.stream().anyMatch(b -> !b.getId().equals(excludeBookingId));
     }
     
-    private void inviteParticipants(RoomBooking booking, List<String> emails, List<Long> userIds) {
-        // Invite by email
-        if (emails != null) {
-            emails.forEach(email -> {
-                User user = userRepository.findByEmail(email).orElse(null);
-                if (user != null) {
-                    createParticipantInvitation(booking, user);
-                }
-            });
-        }
-        
-        // Invite by user ID
-        if (userIds != null) {
-            userIds.forEach(userId -> {
-                User user = userRepository.findById(userId).orElse(null);
-                if (user != null) {
-                    createParticipantInvitation(booking, user);
-                }
-            });
-        }
+     private void inviteParticipants(RoomBooking booking, 
+                               List<String> emails, 
+                               List<Long> userIds,
+                               List<String> identifiers) {
+    
+    // Invite by email - NO TRY-CATCH
+    if (emails != null && !emails.isEmpty()) {
+        emails.forEach(email -> {
+            if (!isValidEmail(email)) {
+                throw new IllegalArgumentException("Invalid email format: " + email);
+            }
+            
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new ResourceNotFoundException("Student not found with email: " + email));
+            
+            validateAndCreateInvitation(booking, user);
+        });
     }
     
-    private void createParticipantInvitation(RoomBooking booking, User user) {
-        BookingParticipant participant = new BookingParticipant();
-        participant.setBooking(booking);
-        participant.setUser(user);
-        participant.setStatus(BookingParticipant.ParticipantStatus.INVITED);
-        participantRepository.save(participant);
-        
-        // Send invitation notification
-        notificationService.addNotification(
-                user.getEmail(),
-                "Room Booking Invitation",
-                String.format("You've been invited to join: %s", booking.getTitle()),
-                "BOOKING_INVITATION"
-        );
+    // Invite by user ID 
+    if (userIds != null && !userIds.isEmpty()) {
+        userIds.forEach(userId -> {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Student not found with ID: " + userId));
+            
+            validateAndCreateInvitation(booking, user);
+        });
     }
+    
+    // Invite by identifier 
+    if (identifiers != null && !identifiers.isEmpty()) {
+        identifiers.forEach(identifier -> {
+            if (identifier == null || identifier.trim().isEmpty()) {
+                throw new IllegalArgumentException("Invalid Student: " + identifier);
+            }
+            
+            User user = userRepository.findByIdentifier(identifier.trim())
+                    .orElseThrow(() -> new ResourceNotFoundException("Student not found with Id: " + identifier));
+            
+            validateAndCreateInvitation(booking, user);
+        });
+    }
+
+    
+    // Invite by identifier (studentId or employeeId)
+    if (identifiers != null && !identifiers.isEmpty()) {
+        identifiers.forEach(identifier -> {
+            try {
+                if (identifier == null || identifier.trim().isEmpty()) {
+                    throw new IllegalArgumentException("Invalid identifier: " + identifier);
+                }
+                
+                User user = userRepository.findByIdentifier(identifier.trim()).orElse(null);
+                if (user == null) {
+                    throw new ResourceNotFoundException("User not found with identifier: " + identifier);
+                }
+                
+                // Validate and create invitation
+                validateAndCreateInvitation(booking, user);
+                
+            } catch (Exception e) {
+                System.err.println("Failed to invite user with identifier " + identifier + ": " + e.getMessage());
+            }
+        });
+    }
+}
+
+private boolean isValidEmail(String email) {
+    if (email == null || email.trim().isEmpty()) {
+        return false;
+    }
+    // Simple email validation
+    return email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+}
+private void validateAndCreateInvitation(RoomBooking booking, User user) {
+    // 1. Check if user is the booking owner/creator
+    if (booking.getUser().equals(user)) {
+        throw new IllegalArgumentException("Cannot invite the booking creator: " + user.getFullName());
+    }
+    
+    // 2. Check if user is already invited or participating
+    boolean alreadyInvited = participantRepository.findByBookingAndUser(booking, user).isPresent();
+    if (alreadyInvited) {
+        throw new IllegalArgumentException("User is already invited: " + user.getFullName());
+    }
+    
+    // 3. Check booking capacity
+    long currentParticipants = participantRepository.countAcceptedParticipants(booking);
+    if (currentParticipants >= booking.getMaxParticipants() - 1) { // -1 for organizer
+        throw new IllegalArgumentException("Booking is at full capacity");
+    }
+    
+    // 4. Check if booking allows new participants
+    if (!booking.isAllowJoining()) {
+        throw new IllegalArgumentException("This booking does not allow new participants");
+    }
+    
+    // 5. Check booking status
+    if (booking.getStatus() == RoomBooking.BookingStatus.CANCELLED || 
+        booking.getStatus() == RoomBooking.BookingStatus.COMPLETED) {
+        throw new IllegalArgumentException("Cannot invite to a cancelled or completed booking");
+    }
+    
+    // 6. Check timing - don't allow invitations to past bookings
+    if (booking.getStartTime().isBefore(LocalDateTime.now())) {
+        throw new IllegalArgumentException("Cannot invite to a booking that has already started");
+    }
+    
+    // All validations passed - create the invitation
+    createParticipantInvitation(booking, user);
+}
+
+    
+    private void createParticipantInvitation(RoomBooking booking, User user) {
+    // Double-check for duplicates before creating
+    Optional<BookingParticipant> existingParticipant = participantRepository.findByBookingAndUser(booking, user);
+    if (existingParticipant.isPresent()) {
+        throw new IllegalArgumentException("User is already a participant: " + user.getFullName());
+    }
+    
+    BookingParticipant participant = new BookingParticipant();
+    participant.setBooking(booking);
+    participant.setUser(user);
+    participant.setStatus(BookingParticipant.ParticipantStatus.INVITED);
+    participant.setInvitedAt(LocalDateTime.now()); // Make sure this field exists
+    participantRepository.save(participant);
+    
+    // Send invitation notification
+    notificationService.addNotification(
+            user.getEmail(),
+            "Room Booking Invitation",
+            String.format("You've been invited to join: %s", booking.getTitle()),
+            "BOOKING_INVITATION"
+    );
+}
     
     private void sendBookingNotifications(RoomBooking booking) {
         if (booking.isRequiresApproval()) {
@@ -704,17 +876,35 @@ public MessageResponse inviteParticipants(Long bookingId, InviteParticipantsRequ
         throw new SecurityException("User cannot invite participants to this booking");
     }
     
-    // Invite by email
-    if (request.getInvitedEmails() != null) {
-        inviteParticipants(booking, request.getInvitedEmails(), null);
+    // Validate at least one invitation method is provided
+    if ((request.getInvitedEmails() == null || request.getInvitedEmails().isEmpty()) &&
+        (request.getInvitedUserIds() == null || request.getInvitedUserIds().isEmpty()) &&
+        (request.getInvitedUserIdentifiers() == null || request.getInvitedUserIdentifiers().isEmpty())) {
+        throw new IllegalArgumentException("At least one invitation method must be provided");
     }
     
-    // Invite by user ID
-    if (request.getInvitedUserIds() != null) {
-        inviteParticipants(booking, null, request.getInvitedUserIds());
+    // Track invitation results
+    List<String> errors = new ArrayList<>();
+    int successCount = 0;
+    
+    try {
+        inviteParticipants(booking, 
+                          request.getInvitedEmails(), 
+                          request.getInvitedUserIds(),
+                          request.getInvitedUserIdentifiers());
+        successCount++;
+    } catch (Exception e) {
+        errors.add(e.getMessage());
     }
     
-    return new MessageResponse("Participants invited successfully");
+    // Return appropriate message
+    if (errors.isEmpty()) {
+        return new MessageResponse("All participants invited successfully");
+    } else if (successCount > 0) {
+        return new MessageResponse("Some invitations sent successfully. Errors: " + String.join(", ", errors));
+    } else {
+        throw new IllegalArgumentException("Failed to send invitations: " + String.join(", ", errors));
+    }
 }
 
 // 4. Respond to invitation
@@ -746,18 +936,87 @@ public MessageResponse removeParticipant(Long bookingId, Long participantId, Str
     RoomBooking booking = findBookingById(bookingId);
     User user = findUserByEmail(userEmail);
     
+    // Check if user can edit this booking
     if (!canUserEditBooking(booking, user)) {
         throw new SecurityException("User cannot remove participants from this booking");
     }
     
+    // Find the participant
     BookingParticipant participant = participantRepository.findById(participantId)
             .orElseThrow(() -> new ResourceNotFoundException("Participant not found"));
     
-    participant.setStatus(BookingParticipant.ParticipantStatus.REMOVED);
-    participantRepository.save(participant);
+    // Validate participant belongs to this booking
+    if (!participant.getBooking().getId().equals(bookingId)) {
+        throw new IllegalArgumentException("Participant does not belong to this booking");
+    }
+    
+    // Cannot remove the booking owner
+    if (participant.getUser().equals(booking.getUser())) {
+        throw new IllegalArgumentException("Cannot remove the booking owner");
+    }
+    
+    // Check booking status
+    if (booking.getStatus() == RoomBooking.BookingStatus.COMPLETED ||
+        booking.getStatus() == RoomBooking.BookingStatus.CANCELLED) {
+        throw new IllegalArgumentException("Cannot remove participants from completed or cancelled bookings");
+    }
+    
+    // Store user info for notification before deletion
+    String participantEmail = participant.getUser().getEmail();
+    String participantName = participant.getUser().getFullName();
+    String bookingTitle = booking.getTitle();
+    
+    // CHANGED: Completely delete the participant record
+    participantRepository.delete(participant);
+    
+    // Notify the removed participant
+    notificationService.addNotification(
+            participantEmail,
+            "Removed from Booking",
+            String.format("You have been removed from the booking: %s", bookingTitle),
+            "BOOKING_UPDATE"
+    );
     
     return new MessageResponse("Participant removed successfully");
 }
+
+public MessageResponse removeParticipantByUser(Long bookingId, Long userId, String userEmail) {
+    RoomBooking booking = findBookingById(bookingId);
+    User user = findUserByEmail(userEmail);
+    User participantUser = findUserById(userId);
+    
+    if (!canUserEditBooking(booking, user)) {
+        throw new SecurityException("User cannot remove participants from this booking");
+    }
+    
+    // Find participant by booking and user
+    BookingParticipant participant = participantRepository.findByBookingAndUser(booking, participantUser)
+            .orElseThrow(() -> new ResourceNotFoundException("Participant not found in this booking"));
+    
+    // Cannot remove the booking owner
+    if (participantUser.equals(booking.getUser())) {
+        throw new IllegalArgumentException("Cannot remove the booking owner");
+    }
+    
+    // Store info for notification
+    String participantEmail = participantUser.getEmail();
+    String participantName = participantUser.getFullName();
+    String bookingTitle = booking.getTitle();
+    
+    // Delete the participant
+    participantRepository.delete(participant);
+    
+    // Notify the removed participant
+    notificationService.addNotification(
+            participantEmail,
+            "Removed from Booking",
+            String.format("You have been removed from the booking: %s", bookingTitle),
+            "BOOKING_UPDATE"
+    );
+    
+    return new MessageResponse("Participant removed successfully");
+}
+
 
 // 6. Get recurring series
 public RecurringBookingSeriesResponse getRecurringSeries(Long bookingId, String userEmail) {
