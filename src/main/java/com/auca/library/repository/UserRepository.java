@@ -1,6 +1,6 @@
 package com.auca.library.repository;
 
-import java.time.LocalDate;
+import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -10,7 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import com.auca.library.model.User;
+import com.auca.library.model.*;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
@@ -59,18 +59,54 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = 'ROLE_LIBRARIAN'")
     List<User> findAllLibrarians();
 
-    @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = 'ROLE_LIBRARIAN' AND u.workingDay = :day AND u.activeToday = true")
-    List<User> findActiveLibrariansForDay(@Param("day") LocalDate day);
+    // Fixed: Use activeThisWeek instead of activeToday and proper day checking
+    @Query("SELECT u FROM User u JOIN u.roles r JOIN u.workingDays wd " +
+           "WHERE r.name = 'ROLE_LIBRARIAN' AND wd = :dayOfWeek AND u.activeThisWeek = true")
+    List<User> findActiveLibrariansForDay(@Param("dayOfWeek") DayOfWeek dayOfWeek);
 
-    @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = 'ROLE_LIBRARIAN' AND u.isDefault = true")
+    // Fixed: Use isDefaultLibrarian instead of defaultLibrarian
+    @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = 'ROLE_LIBRARIAN' AND u.isDefaultLibrarian = true")
     Optional<User> findDefaultLibrarian();
 
-    @Query("SELECT COUNT(u) FROM User u JOIN u.roles r WHERE r.name = 'ROLE_LIBRARIAN' AND u.workingDay = :day AND u.activeToday = true")
-    long countActiveLibrariansForDay(@Param("day") LocalDate day);
+    // Fixed: Count active librarians for a day
+    @Query("SELECT COUNT(u) FROM User u JOIN u.roles r JOIN u.workingDays wd " +
+           "WHERE r.name = 'ROLE_LIBRARIAN' AND wd = :dayOfWeek AND u.activeThisWeek = true")
+    long countActiveLibrariansForDay(@Param("dayOfWeek") DayOfWeek dayOfWeek);
 
     @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = 'ROLE_PROFESSOR' " +
            "AND EXISTS (SELECT er FROM EquipmentRequest er WHERE er.user = u AND er.createdAt >= :since)")
     List<User> findActiveProfessors(@Param("since") LocalDateTime since);
+
+    @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = :roleName")
+    List<User> findByRole(@Param("roleName") Role.ERole roleName);
+    
+    @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = 'ROLE_LIBRARIAN' AND u.location = :location")
+    List<User> findLibrariansByLocation(@Param("location") Location location);
+    
+    @Query("SELECT u FROM User u JOIN u.roles r JOIN u.workingDays wd " +
+           "WHERE r.name = 'ROLE_LIBRARIAN' AND wd = :dayOfWeek AND u.location = :location")
+    List<User> findLibrariansByDayAndLocation(@Param("dayOfWeek") DayOfWeek dayOfWeek, 
+                                              @Param("location") Location location);
+
+    @Query("SELECT u FROM User u JOIN u.roles r JOIN u.workingDays wd " +
+           "WHERE r.name = 'ROLE_LIBRARIAN' AND wd = :dayOfWeek AND u.location = :location " +
+           "AND u.activeThisWeek = true")
+    List<User> findActiveLibrariansForDay(@Param("dayOfWeek") DayOfWeek dayOfWeek, 
+                                          @Param("location") Location location);
+    
+    @Query("SELECT u FROM User u JOIN u.roles r " +
+           "WHERE r.name = 'ROLE_LIBRARIAN' AND u.location = :location AND u.isDefaultLibrarian = true")
+    Optional<User> findDefaultLibrarianByLocation(@Param("location") Location location);
+    
+    @Query("SELECT COUNT(u) FROM User u JOIN u.roles r JOIN u.workingDays wd " +
+           "WHERE r.name = 'ROLE_LIBRARIAN' AND wd = :dayOfWeek AND u.location = :location " +
+           "AND u.activeThisWeek = true")
+    long countActiveLibrariansByDayAndLocation(@Param("dayOfWeek") DayOfWeek dayOfWeek, 
+                                              @Param("location") Location location);
+    
+    @Query("SELECT u FROM User u JOIN u.roles r " +
+           "WHERE r.name = 'ROLE_LIBRARIAN' AND u.location = :location AND u.isDefaultLibrarian = true")
+    List<User> findDefaultLibrariansByLocation(@Param("location") Location location);
 
     // Staff with default passwords
     @Query("SELECT u FROM User u WHERE u.employeeId IS NOT NULL AND u.mustChangePassword = true")

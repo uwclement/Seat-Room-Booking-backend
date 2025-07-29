@@ -1,22 +1,26 @@
 package com.auca.library.dto.request;
 
-import jakarta.validation.constraints.NotBlank;
+import com.auca.library.model.Location;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
-import java.time.LocalDate;
+import java.time.DayOfWeek;
+import java.util.Set;
 
 @Data
 public class LibrarianRequest {
-
-    @NotBlank(message = "Name is required")
-    private String name;
-
-    @NotBlank(message = "Phone number is required")
-    private String phone;
-
-    private boolean activeToday;
-
-    private boolean isDefault;
-
-    private LocalDate workingDay;
+    
+    @NotNull(message = "User ID is required")
+    private Long userId;
+    
+    @NotEmpty(message = "At least one working day must be specified")
+    private Set<DayOfWeek> workingDays;
+    
+    @NotNull(message = "Location is required")
+    private Location location;
+    
+    private boolean activeThisWeek = false;
+    
+    private boolean isDefaultLibrarian = false;
 }

@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -26,6 +27,9 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import java.time.DayOfWeek;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.CollectionTable;
 
 @Entity
 @Table(name = "users", 
@@ -94,17 +98,17 @@ public class User {
     private String phone;
 
     // Librarian based fileds
-    private LocalDate workingDay;
+    @ElementCollection
+    @Enumerated(EnumType.STRING)
+    @CollectionTable(name = "user_working_days", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "day_of_week")
+    private Set<DayOfWeek> workingDays = new HashSet<>();
+    @Column(name = "active_this_week")
+    private boolean activeThisWeek = false;   
     private boolean activeToday = false;
-    private boolean isDefault = false;
+    @Column(name = "is_default_librarian")
+    private boolean isDefaultLibrarian = false;
 
-    public boolean isDefault() {
-    return isDefault;
-    }
-
-    public void setIsDefault(boolean isDefault) {
-    this.isDefault = isDefault;
-    }
 
     // Professor based fields
     @ManyToMany(fetch = FetchType.LAZY)
@@ -190,4 +194,33 @@ public class User {
     public boolean isEquipmentAdmin() {
         return hasRole(Role.ERole.ROLE_EQUIPMENT_ADMIN);
     }
+
+    public boolean isActiveLibrarianToday() {
+    DayOfWeek today = LocalDate.now().getDayOfWeek();
+    return isLibrarian() && activeThisWeek && workingDays.contains(today);
+}
+
+// Librarian menthods 
+
+public boolean worksOnDay(DayOfWeek day) {
+    return workingDays.contains(day);
+}
+
+public String getWorkingDaysString() {
+    return workingDays.stream()
+            .map(DayOfWeek::toString)
+            .collect(Collectors.joining(", "));
+}
+
+public void addWorkingDay(DayOfWeek day) {
+    this.workingDays.add(day);
+}
+
+public void removeWorkingDay(DayOfWeek day) {
+    this.workingDays.remove(day);
+}
+
+public void setWorkingDays(Set<DayOfWeek> workingDays) {
+    this.workingDays = workingDays != null ? workingDays : new HashSet<>();
+}
 }

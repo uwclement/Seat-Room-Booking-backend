@@ -1,8 +1,8 @@
 package com.auca.library.model;
 
 public enum Location {
-   GISHUSHU("Gishushu Library", "GSH"),
-    MASORO("Masoro Library", "MSR");
+    GISHUSHU("GISHUSHU", "GSH"),
+    MASORO("MASORO", "MSR");
     
     private final String displayName;
     private final String code;

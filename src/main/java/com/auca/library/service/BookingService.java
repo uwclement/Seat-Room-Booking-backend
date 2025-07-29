@@ -1,5 +1,21 @@
 package com.auca.library.service;
 
+import java.time.DayOfWeek;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.temporal.TemporalAdjusters;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.auca.library.dto.request.CreateBookingRequest;
 import com.auca.library.dto.request.ExtensionRequest;
 import com.auca.library.dto.response.BookingDTO;
@@ -13,22 +29,8 @@ import com.auca.library.repository.BookingRepository;
 import com.auca.library.repository.SeatRepository;
 import com.auca.library.repository.UserRepository;
 import com.auca.library.repository.WaitListRepository;
-import jakarta.mail.MessagingException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.time.DayOfWeek;
-import java.time.Duration;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.temporal.TemporalAdjusters;
-import java.util.List;
-import java.util.stream.Collectors;
+import jakarta.mail.MessagingException;
 
 @Service
 public class BookingService {
@@ -77,7 +79,7 @@ public class BookingService {
         }
 
         // Validate booking time constraints
-        validateBookingTime(request.getStartTime(), request.getEndTime(), user.getId());
+        validateBookingTime(request.getStartTime(), request.getEndTime(), user.getId(), seat);
 
         // Check if seat is available during requested time
         if (!seatService.isSeatAvailable(seat.getId(), request.getStartTime(), request.getEndTime())) {
@@ -292,7 +294,7 @@ public class BookingService {
             LocalDateTime newEndTime = booking.getEndTime().plusHours(1);
 
             // NEW: Check if the extended time is valid according to library hours
-            if (!libraryScheduleService.isLibraryOpenAt(newEndTime.toLocalDate(), newEndTime.toLocalTime())) {
+            if (!libraryScheduleService.isLibraryOpenAt(newEndTime.toLocalDate(), newEndTime.toLocalTime(), user.getLocation())) {
                 throw new BadRequestException("Cannot extend booking beyond library operating hours");
             }
 
@@ -343,7 +345,7 @@ public class BookingService {
         return start1.isBefore(end2) && end1.isAfter(start2);
     }
 
-    private void validateBookingTime(LocalDateTime startTime, LocalDateTime endTime, Long userId) {
+    private void validateBookingTime(LocalDateTime startTime, LocalDateTime endTime, Long userId, Seat seat) {
         LocalDateTime now = LocalDateTime.now();
         LocalDate bookingDate = startTime.toLocalDate();
         LocalTime bookingStartTime = startTime.toLocalTime();
@@ -366,7 +368,7 @@ public class BookingService {
         }
 
         // Validate against library schedule and closures
-        validateAgainstLibrarySchedule(bookingDate, bookingStartTime, bookingEndTime);
+        validateAgainstLibrarySchedule(bookingDate, bookingStartTime, bookingEndTime, seat);
 
         // Check if booking is within the current week (or next week from Sunday)
         LocalDate today = LocalDate.now();
@@ -393,17 +395,17 @@ public class BookingService {
     }
 
     // Validate booking against library schedule
-    private void validateAgainstLibrarySchedule(LocalDate date, LocalTime startTime, LocalTime endTime) {
+    private void validateAgainstLibrarySchedule(LocalDate date, LocalTime startTime, LocalTime endTime, Seat seat) {
         // Check if library is open during the booking period
-        if (!libraryScheduleService.isLibraryOpenAt(date, startTime)) {
+        if (!libraryScheduleService.isLibraryOpenAt(date, startTime, seat.getLocation())) {
             throw new BadRequestException("Library is closed at the requested start time");
         }
-        if (!libraryScheduleService.isLibraryOpenAt(date, endTime)) {
+        if (!libraryScheduleService.isLibraryOpenAt(date, endTime, seat.getLocation())) {
             throw new BadRequestException("Library is closed at the requested end time");
         }
 
         // Validate the entire booking period against library hours
-        if (!libraryScheduleService.isValidBookingTime(date, startTime, endTime)) {
+        if (!libraryScheduleService.isValidBookingTime(date, startTime, endTime, seat.getLocation())) {
             throw new BadRequestException(
                     "Your booking extends beyond library operating hours. Please check the library schedule for "
                             + date.getDayOfWeek());
@@ -484,7 +486,7 @@ public BookingDTO extendBooking(Long bookingId, Integer additionalHours) {
     LocalDateTime newEndTime = booking.getEndTime().plusHours(additionalHours);
 
     // Validate against library hours
-    if (!libraryScheduleService.isLibraryOpenAt(newEndTime.toLocalDate(), newEndTime.toLocalTime())) {
+    if (!libraryScheduleService.isLibraryOpenAt(newEndTime.toLocalDate(), newEndTime.toLocalTime(), user.getLocation())) {
         throw new BadRequestException("Cannot extend booking beyond library operating hours");
     }
 
@@ -517,6 +519,7 @@ public BookingDTO extendBooking(Long bookingId, Integer additionalHours) {
         dto.setUserId(booking.getUser().getId());
         dto.setUserName(booking.getUser().getFullName());
         dto.setSeatId(booking.getSeat().getId());
+        dto.setIdentifier(booking.getUser().getIdentifier());
         dto.setSeatNumber(booking.getSeat().getSeatNumber());
         dto.setZoneType(booking.getSeat().getZoneType());
         dto.setStartTime(booking.getStartTime());

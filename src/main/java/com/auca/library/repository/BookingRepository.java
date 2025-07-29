@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 
 import com.auca.library.model.Booking;
 import com.auca.library.model.Booking.BookingStatus;
+import com.auca.library.model.Location;
 import com.auca.library.model.Seat;
 import com.auca.library.model.User;
 
@@ -50,15 +51,15 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     List<Booking> findByStartTimeBetween(LocalDateTime start, LocalDateTime end);
     
     List<Booking> findByEndTimeAfterAndStartTimeBeforeAndStatusIn(
-            LocalDateTime endTimeAfter, 
-            LocalDateTime startTimeBefore, 
+            LocalDateTime endOfDay,
+          LocalDateTime startOfDay,
             List<BookingStatus> statuses);
     
     List<Booking> findByUserId(Long userId);
     
     List<Booking> findBySeatId(Long seatId);
 
-
+    List<Booking> findBySeat_Location(Location location);
 
 // Find bookings that started more than 20 minutes ago and haven't been checked in
 
@@ -126,6 +127,21 @@ List<Booking> findBookingsByDateRange(
 List<Booking> findBookingsByDate(
     @Param("startOfDay") LocalDateTime startOfDay,
     @Param("startOfNextDay") LocalDateTime startOfNextDay
+);
+
+
+// by location queries 
+
+@Query("SELECT b FROM Booking b " +
+       "WHERE b.startTime >= :startOfDay AND b.startTime < :endOfDay " +
+       "AND b.status IN :statuses " +
+       "AND b.seat.location = :location " +
+       "ORDER BY b.startTime ASC")
+List<Booking> findTodaysActiveBookingsByLocation(
+    @Param("location") Location location,
+    @Param("startOfDay") LocalDateTime startOfDay,
+    @Param("endOfDay") LocalDateTime endOfDay,
+    @Param("statuses") List<Booking.BookingStatus> statuses
 );
 
 }

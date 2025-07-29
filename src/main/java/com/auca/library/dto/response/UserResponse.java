@@ -1,11 +1,13 @@
 package com.auca.library.dto.response;
 
-import com.auca.library.model.Location;
-import lombok.Data;
-
-import java.time.LocalDate;
+import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
+
+import com.auca.library.model.Location;
+
+import lombok.Data;
 
 @Data
 public class UserResponse {
@@ -21,9 +23,11 @@ public class UserResponse {
     private boolean mustChangePassword;
     
     // Librarian based fields
-    private LocalDate workingDay;
-    private boolean activeToday;
-    private boolean isDefault;
+    private Set<DayOfWeek> workingDays;
+    private String workingDaysString;
+    private boolean activeThisWeek;
+    private boolean isDefaultLibrarian;
+    private boolean isActiveToday;
     
     // Professor based fields
     private boolean professorApproved;

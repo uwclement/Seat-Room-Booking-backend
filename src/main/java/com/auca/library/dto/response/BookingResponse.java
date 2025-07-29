@@ -1,7 +1,8 @@
 package com.auca.library.dto.response;
 
-import lombok.Data;
 import java.time.LocalDateTime;
+
+import lombok.Data;
 
 @Data
 public class BookingResponse {
@@ -9,6 +10,7 @@ public class BookingResponse {
     private Long userId;
     private String userName;
     private Long seatId;
+    private String identifier; 
     private String seatNumber;
     private LocalDateTime startTime;
     private LocalDateTime endTime;

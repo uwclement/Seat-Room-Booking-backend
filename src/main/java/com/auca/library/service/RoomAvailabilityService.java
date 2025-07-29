@@ -1,16 +1,26 @@
 package com.auca.library.service;
 
-import com.auca.library.dto.response.*;
-import com.auca.library.exception.ResourceNotFoundException;
-import com.auca.library.model.*;
-import com.auca.library.repository.*;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
-import java.util.*;
-import java.util.stream.Collectors;
+import com.auca.library.dto.response.RoomAvailabilityResponse;
+import com.auca.library.dto.response.RoomResponse;
+import com.auca.library.dto.response.WeeklyRoomAvailabilityResponse;
+import com.auca.library.exception.ResourceNotFoundException;
+import com.auca.library.model.Location;
+import com.auca.library.model.Room;
+import com.auca.library.model.RoomBooking;
+import com.auca.library.repository.BookingParticipantRepository;
+import com.auca.library.repository.RoomBookingRepository;
+import com.auca.library.repository.RoomRepository;
 
 @Service
 public class RoomAvailabilityService {
@@ -73,11 +83,11 @@ public class RoomAvailabilityService {
             dayAvail.setDate(dayStart);
             
             // Check if library is open
-            boolean isLibraryOpen = scheduleService.isLibraryOpen(dayStart.toLocalDate());
+            boolean isLibraryOpen = scheduleService.isLibraryOpen(dayStart.toLocalDate(), Location.GISHUSHU);
             dayAvail.setLibraryOpen(isLibraryOpen);
             
             if (isLibraryOpen) {
-                dayAvail.setLibraryHours(scheduleService.getLibraryHours(dayStart.toLocalDate()));
+                dayAvail.setLibraryHours(scheduleService.getLibraryHours(dayStart.toLocalDate(), Location.GISHUSHU));
                 dayAvail.setAvailableSlots(generateDailyAvailableSlots(room, dayStart, dayEnd));
                 dayAvail.setBookedSlots(generateDailyBookedSlots(room, dayStart, dayEnd));
             }

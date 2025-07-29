@@ -5,6 +5,8 @@ import java.time.LocalTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -33,6 +35,9 @@ public class LibraryClosureException {
     private boolean closedAllDay = false;
 
     private String reason;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = true) 
+    private Location location;
 
     public LibraryClosureException(LocalDate date, boolean closedAllDay, String reason) {
         this.date = date;

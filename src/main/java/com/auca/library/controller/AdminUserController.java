@@ -384,9 +384,10 @@ public class AdminUserController {
         staffRequest.setPhone(request.getPhone());
         staffRequest.setLocation(request.getLocation());
         staffRequest.setRole(request.getRoles().get(0)); // Primary role
-        staffRequest.setWorkingDay(request.getWorkingDay());
-        staffRequest.setActiveToday(request.isActiveToday());
-        staffRequest.setDefault(request.isDefault());
+        staffRequest.setWorkingDays(request.getWorkingDays());
+        // staffRequest.setActiveToday(request.isActiveToday());
+        staffRequest.setActiveThisWeek(request.isActiveThisWeek());
+        staffRequest.setDefaultLibrarian(request.isDefaultLibrarian());
         return staffRequest;
     }
 

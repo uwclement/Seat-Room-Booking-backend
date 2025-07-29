@@ -92,7 +92,7 @@ public class RoomBookingService {
         Room room = findRoomById(request.getRoomId());
         
         // Validate booking request
-        bookingValidationService.validateBookingRequest(request, user, room);
+        // bookingValidationService.validateBookingRequest(request, user, room);
         
         // Check for conflicts/all already booked 
         RoomAvailabilityResponse availability = roomAvailabilityService.getRoomAvailability(room.getId());

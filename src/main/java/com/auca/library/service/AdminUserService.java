@@ -2,6 +2,7 @@
 package com.auca.library.service;
 
 import java.security.SecureRandom;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -344,7 +345,7 @@ public class AdminUserService {
         User user = findUserById(id);
         
         // Prevent deletion of default librarian without replacement
-        if (user.isLibrarian() && user.isDefault()) {
+        if (user.isLibrarian() && user.isDefaultLibrarian()) {
             throw new IllegalStateException("Cannot delete default librarian. Please set another librarian as default first.");
         }
         
@@ -368,7 +369,7 @@ public class AdminUserService {
             User user = findUserById(id);
             
             // Apply same validation as single delete
-            if (user.isLibrarian() && user.isDefault()) {
+            if (user.isLibrarian() && user.isDefaultLibrarian()) {
                 throw new IllegalStateException("Cannot delete default librarian: " + user.getFullName());
             }
             
@@ -392,50 +393,64 @@ public class AdminUserService {
     // =============== HELPER METHODS ===============
 
     private void handleLibrarianCreation(User user, StaffCreationRequest request) {
-        user.setWorkingDay(request.getWorkingDay());
-        user.setActiveToday(request.isActiveToday());
-        
-        // Handle default librarian logic
-        if (request.isDefault()) {
-            userRepository.findDefaultLibrarian().ifPresent(existing -> {
-                existing.setIsDefault(false);
-                userRepository.save(existing);
-            });
-            user.setIsDefault(true);
-        }
+    user.setWorkingDays(request.getWorkingDays());
+    user.setActiveThisWeek(request.isActiveThisWeek()); 
+    
+    
+    if (request.isDefaultLibrarian()) { 
+        userRepository.findDefaultLibrarianByLocation(request.getLocation()).ifPresent(existing -> {
+            existing.setDefaultLibrarian(false); 
+        });
+        user.setDefaultLibrarian(true); 
+    }
 
-        // Check active librarian limit
-        if (request.isActiveToday() && request.getWorkingDay() != null) {
-            long activeCount = userRepository.countActiveLibrariansForDay(request.getWorkingDay());
+    // Check active librarian limit for each working day
+    if (request.isActiveThisWeek() && request.getWorkingDays() != null && !request.getWorkingDays().isEmpty()) {
+        for (DayOfWeek day : request.getWorkingDays()) {
+            long activeCount = userRepository.countActiveLibrariansByDayAndLocation(day, request.getLocation());
             if (activeCount >= 2) {
-                throw new IllegalStateException("Only 2 librarians can be active per day.");
+                throw new IllegalStateException(
+                    "Only 2 librarians can be active on " + day + " at " + request.getLocation().getDisplayName()
+                );
             }
         }
     }
+}
 
-    private void handleLibrarianUpdate(User user, StaffUpdateRequest request) {
-        user.setWorkingDay(request.getWorkingDay());
-        user.setActiveToday(request.isActiveToday());
+private void handleLibrarianUpdate(User user, StaffUpdateRequest request) {
+    user.setWorkingDays(request.getWorkingDays());
+    user.setActiveThisWeek(request.isActiveThisWeek()); 
+    
+    if (request.isDefaultLibrarian() && !user.isDefaultLibrarian()) { 
+        userRepository.findDefaultLibrarianByLocation(request.getLocation()).ifPresent(existing -> {
+            existing.setDefaultLibrarian(false);
+            userRepository.save(existing);
+        });
+        user.setDefaultLibrarian(true); 
+    } else if (!request.isDefaultLibrarian()) { 
+        user.setDefaultLibrarian(false); 
+    }
+
+    if (request.isActiveThisWeek() && !user.isActiveThisWeek() && 
+        request.getWorkingDays() != null && !request.getWorkingDays().isEmpty()) {
         
-        // Handle default librarian logic
-        if (request.isDefault() && !user.isDefault()) {
-            userRepository.findDefaultLibrarian().ifPresent(existing -> {
-                existing.setIsDefault(false);
-                userRepository.save(existing);
-            });
-            user.setIsDefault(true);
-        } else if (!request.isDefault()) {
-            user.setIsDefault(false);
-        }
-
-        // Check active librarian limit
-        if (request.isActiveToday() && !user.isActiveToday() && request.getWorkingDay() != null) {
-            long activeCount = userRepository.countActiveLibrariansForDay(request.getWorkingDay());
+        for (DayOfWeek day : request.getWorkingDays()) {
+            
+            long activeCount = userRepository.countActiveLibrariansByDayAndLocation(day, request.getLocation());
+            
+         
+            if (user.isActiveThisWeek() && user.getWorkingDays().contains(day)) {
+                activeCount--; 
+            }
+            
             if (activeCount >= 2) {
-                throw new IllegalStateException("Only 2 librarians can be active per day.");
+                throw new IllegalStateException(
+                    "Only 2 librarians can be active on " + day + " at " + request.getLocation().getDisplayName()
+                );
             }
         }
     }
+}
 
     private String generateDefaultPassword() {
         SecureRandom random = new SecureRandom();
@@ -474,9 +489,12 @@ public class AdminUserService {
         
         // Set librarian-specific fields
         if (user.isLibrarian()) {
-            response.setWorkingDay(user.getWorkingDay());
-            response.setActiveToday(user.isActiveToday());
-            response.setDefault(user.isDefault());
+            response.setWorkingDays(user.getWorkingDays());
+            response.setWorkingDaysString(user.getWorkingDaysString());
+            response.setActiveThisWeek(user.isActiveThisWeek());
+            response.setDefaultLibrarian(user.isDefaultLibrarian());
+            response.setActiveToday(user.isActiveLibrarianToday());
+            response.setLocation(user.getLocation());
         }
         
         // Set professor-specific fields

@@ -22,6 +22,7 @@ import com.auca.library.dto.request.AdminCancellationRequest;
 import com.auca.library.dto.request.BulkCancellationRequest;
 import com.auca.library.dto.response.BookingResponse;
 import com.auca.library.dto.response.MessageResponse;
+import com.auca.library.model.Location;
 import com.auca.library.service.AdminBookingService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -38,20 +39,22 @@ public class AdminBookingController {
 
     // Get all current bookings
     @GetMapping("/current")
-    public ResponseEntity<List<BookingResponse>> getCurrentBookings() {
-        return ResponseEntity.ok(adminBookingService.getCurrentBookings());
+    public ResponseEntity<List<BookingResponse>> getCurrentBookings(
+        @RequestParam(required = false) Location location) {
+        return ResponseEntity.ok(adminBookingService.getCurrentBookings(location));
     }
+
 
     // Get all bookings for a specific date
     @GetMapping("/date/{date}")
-    public ResponseEntity<List<BookingResponse>> getBookingsByDate(
+    public ResponseEntity<List<BookingResponse>> getBookingsByDate( @RequestParam(required = false) Location location,
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return ResponseEntity.ok(adminBookingService.getBookingsByDate(date));
     }
 
     // Get all bookings for a date range
     @GetMapping("/range")
-    public ResponseEntity<List<BookingResponse>> getBookingsInRange(
+    public ResponseEntity<List<BookingResponse>> getBookingsInRange( @RequestParam(required = false) Location location,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end) {
         return ResponseEntity.ok(adminBookingService.getBookingsInDateRange(start, end));
