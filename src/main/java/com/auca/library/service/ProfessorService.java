@@ -165,7 +165,7 @@ public class ProfessorService {
     private String getHodEmail() {
         return userRepository.findHod()
                 .map(User::getEmail)
-                .orElse(null); // Return null if no HOD found
+                .orElse(null); 
     }
 
     private ProfessorResponse mapToProfessorResponse(User professor) {

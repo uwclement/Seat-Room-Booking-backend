@@ -1,15 +1,16 @@
 package com.auca.library.security.services;
 
-import com.auca.library.model.User;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.UserDetails;
-
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
+import com.auca.library.model.User;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 public class UserDetailsImpl implements UserDetails {
     private static final long serialVersionUID = 1L;
@@ -17,18 +18,19 @@ public class UserDetailsImpl implements UserDetails {
     private Long id;
     private String fullName;
     private String email;
-    private String identifier; 
-    private String userType; 
+    private String identifier;
+    private String location;
+    private String userType;
     private boolean mustChangePassword;
 
     @JsonIgnore
     private String password;
-    
+
     private boolean emailVerified;
 
     private Collection<? extends GrantedAuthority> authorities;
 
-    public UserDetailsImpl(Long id, String fullName, String email, String identifier, String userType,
+    public UserDetailsImpl(Long id, String fullName, String email, String identifier, String userType, String location,
                            String password, boolean emailVerified, boolean mustChangePassword,
                            Collection<? extends GrantedAuthority> authorities) {
         this.id = id;
@@ -36,6 +38,7 @@ public class UserDetailsImpl implements UserDetails {
         this.email = email;
         this.identifier = identifier;
         this.userType = userType;
+        this.location = location;
         this.password = password;
         this.emailVerified = emailVerified;
         this.mustChangePassword = mustChangePassword;
@@ -56,6 +59,7 @@ public class UserDetailsImpl implements UserDetails {
                 user.getEmail(),
                 identifier,
                 userType,
+                user.getLocation().toString(),
                 user.getPassword(),
                 user.isEmailVerified(),
                 user.isMustChangePassword(),
@@ -83,10 +87,14 @@ public class UserDetailsImpl implements UserDetails {
         return identifier;
     }
 
+    public String getLocation() {
+        return location;
+    }
+
     public String getUserType() {
         return userType;
     }
-    
+
     public boolean isEmailVerified() {
         return emailVerified;
     }

@@ -68,7 +68,7 @@ public class AdminQRCodeService {
         byte[] qrImage = qrGenerationService.generateQRCodeImage(qrUrl, seat.getSeatNumber());
         
         // Save QR code image
-        String filename = qrGenerationService.generateAndSaveQRCode(qrUrl, "SEAT", seat.getSeatNumber());
+        String filename = qrGenerationService.generateAndSaveQRCode(qrUrl, "SEAT", seat.getSeatNumber().replaceAll("[\\n\\r\\t\\s]+", "_"));
         String imagePath = qrStorageService.storeQRCode(qrImage, filename, "seat");
         
         // Archive old QR code if exists

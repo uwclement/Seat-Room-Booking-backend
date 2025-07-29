@@ -36,36 +36,36 @@ public class LibrarySchedule {
     @Column(nullable = false)
     private LocalTime closeTime;
 
-    // Flag to mark a day as completely closed
+    // Add location field
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Location location;
+
     @Column(name = "open", nullable = false)
     private boolean isOpen = true;
 
-    // Special closing time for one-day modifications (e.g., early closing)
     @Column
     private LocalTime specialCloseTime;
 
-    // Message explaining special arrangements
     @Column(columnDefinition = "TEXT")
     private String message;
 
-    // Track when the schedule was last modified
     @Column
     private LocalDateTime lastModified;
 
-    public LibrarySchedule(DayOfWeek dayOfWeek, LocalTime openTime, LocalTime closeTime) {
+    public LibrarySchedule(DayOfWeek dayOfWeek, LocalTime openTime, LocalTime closeTime, Location location) {
         this.dayOfWeek = dayOfWeek;
         this.openTime = openTime;
         this.closeTime = closeTime;
+        this.location = location;
         this.isOpen = true;
         this.lastModified = LocalDateTime.now();
     }
 
-    // Convenience method to get effective closing time (considers special closing)
     public LocalTime getEffectiveCloseTime() {
         return specialCloseTime != null ? specialCloseTime : closeTime;
     }
 
-    // Method to check if library is open at a specific time
     public boolean isOpenAt(LocalTime time) {
         if (!isOpen) {
             return false;

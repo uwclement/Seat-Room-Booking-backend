@@ -29,7 +29,7 @@ public class EmailService {
         helper.setTo(to);
         helper.setSubject("Verify your AUCA Library Account");
         
-        String verificationUrl = "http://localhost:3000/verify?token=" + token;
+        String verificationUrl = "http://192.168.1.68:3000/verify?token=" + token;
         
         String content = "<html><body>"
                 + "<h2>AUCA Library Account Verification</h2>"
@@ -77,8 +77,8 @@ public class EmailService {
         helper.setTo(to);
         helper.setSubject("Your AUCA Library Booking is Ending Soon");
         
-        String confirmUrl = "http://localhost:3000/bookings/extend/" + bookingId + "?extend=true";
-        String declineUrl = "http://localhost:3000/bookings/extend/" + bookingId + "?extend=false";
+        String confirmUrl = "http://http://192.168.1.68:3000/bookings";
+
         
         String content = "<html><body>"
                 + "<h2>AUCA Library Booking Notification</h2>"
@@ -86,9 +86,7 @@ public class EmailService {
                 + "<p>Would you like to extend your booking by 1 hour?</p>"
                 + "<p>"
                 + "<a href='" + confirmUrl + "' style='background-color: #4CAF50; color: white; "
-                + "padding: 10px 15px; text-decoration: none; margin-right: 10px;'>Yes, Extend</a>"
-                + "<a href='" + declineUrl + "' style='background-color: #f44336; color: white; "
-                + "padding: 10px 15px; text-decoration: none;'>No, Thank You</a>"
+                + "padding: 10px 15px; text-decoration: none; margin-right: 10px;'>Extend</a>"
                 + "</p>"
                 + "<p>Please respond within 5 minutes. If you don't respond, your booking will end as scheduled.</p>"
                 + "</body></html>";

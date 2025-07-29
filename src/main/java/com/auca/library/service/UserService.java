@@ -1,10 +1,13 @@
 package com.auca.library.service;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +28,10 @@ public class UserService {
         return userRepository.findAll().stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
+    }
+
+    public Optional<User> findByEmail(String email) {
+        return userRepository.findByEmail(email);
     }
 
     public List<UserResponse> getAllStudents() {
@@ -69,8 +76,10 @@ public class UserService {
                 .collect(Collectors.toList());
     }
 
+    // Fixed: Pass DayOfWeek instead of LocalDate
     public List<UserResponse> getActiveLibrariansForDay(LocalDate day) {
-        return userRepository.findActiveLibrariansForDay(day).stream()
+        DayOfWeek dayOfWeek = day.getDayOfWeek();
+        return userRepository.findActiveLibrariansForDay(dayOfWeek).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -82,7 +91,7 @@ public class UserService {
     }
 
     public UserResponse getActiveOrDefaultLibrarian(LocalDate day) {
-        List<User> activeLibrarians = userRepository.findActiveLibrariansForDay(day);
+        List<User> activeLibrarians = userRepository.findActiveLibrariansForDay(day.getDayOfWeek());
         if (!activeLibrarians.isEmpty()) {
             return mapToResponse(activeLibrarians.get(0));
         }
@@ -120,6 +129,12 @@ public class UserService {
                 .collect(Collectors.toList());
     }
 
+    public User getCurrentUser(Authentication authentication) {
+        String email = authentication.getName();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Current user not found"));
+    }
+
     // Update methods
     @Transactional
     public UserResponse updateUser(Long id, UserResponse updateRequest) {
@@ -129,27 +144,39 @@ public class UserService {
         user.setPhone(updateRequest.getPhone());
         user.setLocation(updateRequest.getLocation());
         
-        // Update librarian-specific fields if applicable
         if (user.isLibrarian()) {
-            user.setWorkingDay(updateRequest.getWorkingDay());
-            user.setActiveToday(updateRequest.isActiveToday());
+            user.setWorkingDays(updateRequest.getWorkingDays()); 
+            user.setActiveThisWeek(updateRequest.isActiveThisWeek());
             
-            // Handle default librarian logic
-            if (updateRequest.isDefault() && !user.isDefault()) {
-                userRepository.findDefaultLibrarian().ifPresent(existing -> {
-                    existing.setIsDefault(false);
+            // Fixed: Use isDefaultLibrarian instead of setDefaultLibrarian
+            if (updateRequest.isDefaultLibrarian() && !user.isDefaultLibrarian()) { 
+                userRepository.findDefaultLibrarianByLocation(user.getLocation()).ifPresent(existing -> {
+                    existing.setDefaultLibrarian(false); 
                     userRepository.save(existing);
                 });
-                user.setIsDefault(true);
-            } else if (!updateRequest.isDefault()) {
-                user.setIsDefault(false);
+                user.setDefaultLibrarian(true); 
+            } else if (!updateRequest.isDefaultLibrarian()) { 
+                user.setDefaultLibrarian(false); 
             }
 
-            // Check active librarian limit
-            if (updateRequest.isActiveToday() && !user.isActiveToday() && updateRequest.getWorkingDay() != null) {
-                long activeCount = userRepository.countActiveLibrariansForDay(updateRequest.getWorkingDay());
-                if (activeCount >= 2) {
-                    throw new IllegalStateException("Only 2 librarians can be active per day.");
+            // Check active librarian limit for each working day
+            if (updateRequest.isActiveThisWeek() && !user.isActiveThisWeek() && 
+                updateRequest.getWorkingDays() != null && !updateRequest.getWorkingDays().isEmpty()) {
+                
+                for (DayOfWeek day : updateRequest.getWorkingDays()) {
+                    // Count existing active librarians for this day and location
+                    long activeCount = userRepository.countActiveLibrariansByDayAndLocation(day, user.getLocation());
+                    
+                    // If current user was previously active on this day, don't count them in the limit
+                    if (user.isActiveThisWeek() && user.getWorkingDays() != null && user.getWorkingDays().contains(day)) {
+                        activeCount--; // Subtract current user from count since they're being updated
+                    }
+                    
+                    if (activeCount >= 2) {
+                        throw new IllegalStateException(
+                            "Only 2 librarians can be active on " + day + " at " + user.getLocation().getDisplayName()
+                        );
+                    }
                 }
             }
         }
@@ -162,7 +189,7 @@ public class UserService {
         User user = findUserById(id);
         
         // Prevent deletion of default librarian without replacing
-        if (user.isLibrarian() && user.isDefault()) {
+        if (user.isLibrarian() && user.isDefaultLibrarian()) {
             throw new IllegalStateException("Cannot delete default librarian. Please set another librarian as default first.");
         }
         
@@ -219,9 +246,9 @@ public class UserService {
         
         // Set librarian-specific fields
         if (user.isLibrarian()) {
-            response.setWorkingDay(user.getWorkingDay());
-            response.setActiveToday(user.isActiveToday());
-            response.setDefault(user.isDefault());
+            response.setWorkingDays(user.getWorkingDays());
+            response.setActiveThisWeek(user.isActiveThisWeek()); // Fixed: Use isActiveThisWeek instead of isActiveToday
+            response.setDefaultLibrarian(user.isDefaultLibrarian());
         }
         
         // Set professor-specific fields

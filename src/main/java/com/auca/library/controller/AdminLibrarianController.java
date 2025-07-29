@@ -1,74 +1,74 @@
 package com.auca.library.controller;
 
-import java.time.LocalDate;
-import java.util.List;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
+import com.auca.library.dto.request.CreateLibrarianRequest;
 import com.auca.library.dto.request.LibrarianRequest;
 import com.auca.library.dto.response.LibrarianResponse;
 import com.auca.library.dto.response.MessageResponse;
+import com.auca.library.model.Location;
 import com.auca.library.service.LibrarianService;
-
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.DayOfWeek;
+import java.util.List;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
 @RequestMapping("/api/admin/librarians")
-@PreAuthorize("hasRole('ADMIN') or hasRole('LIBRARIAN') ")
+@PreAuthorize("hasRole('ADMIN')")
 public class AdminLibrarianController {
 
     @Autowired
     private LibrarianService librarianService;
 
+    // Get all librarians across all locations
     @GetMapping
     public ResponseEntity<List<LibrarianResponse>> getAllLibrarians() {
         return ResponseEntity.ok(librarianService.getAllLibrarians());
     }
 
-    @GetMapping("/active")
-    public ResponseEntity<List<LibrarianResponse>> getActiveLibrariansToday(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return ResponseEntity.ok(librarianService.getActiveLibrariansForDay(date));
+    // Get librarians by location
+    @GetMapping("/location/{location}")
+    public ResponseEntity<List<LibrarianResponse>> getLibrariansByLocation(
+            @PathVariable Location location) {
+        return ResponseEntity.ok(librarianService.getLibrariansByLocation(location));
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<LibrarianResponse> getLibrarianById(@PathVariable Long id) {
-        return ResponseEntity.ok(librarianService.getLibrarianById(id));
+    // Get librarians scheduled for a specific day and location
+    @GetMapping("/schedule")
+    public ResponseEntity<List<LibrarianResponse>> getLibrariansForDay(
+            @RequestParam DayOfWeek dayOfWeek,
+            @RequestParam Location location) {
+        return ResponseEntity.ok(librarianService.getLibrariansForDay(dayOfWeek, location));
     }
 
+    // Get weekly schedule for a location
+    @GetMapping("/schedule/weekly/{location}")
+    public ResponseEntity<List<LibrarianResponse>> getWeeklySchedule(
+            @PathVariable Location location) {
+        return ResponseEntity.ok(librarianService.getWeeklySchedule(location));
+    }
+
+    // Create new librarian user
     @PostMapping
-    public ResponseEntity<LibrarianResponse> createLibrarian(@Valid @RequestBody LibrarianRequest request) {
+    public ResponseEntity<LibrarianResponse> createLibrarian(
+            @Valid @RequestBody CreateLibrarianRequest request) {
         return ResponseEntity.ok(librarianService.createLibrarian(request));
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<LibrarianResponse> updateLibrarian(
-            @PathVariable Long id, @Valid @RequestBody LibrarianRequest request) {
-        return ResponseEntity.ok(librarianService.updateLibrarian(id, request));
+    // Update librarian schedule
+    @PutMapping("/schedule")
+    public ResponseEntity<LibrarianResponse> updateLibrarianSchedule(
+            @Valid @RequestBody LibrarianRequest request) {
+        return ResponseEntity.ok(librarianService.updateLibrarianSchedule(request));
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<MessageResponse> deleteLibrarian(@PathVariable Long id) {
-        return ResponseEntity.ok(librarianService.deleteLibrarian(id));
-    }
-
-    @GetMapping("/default-or-active")
-    public ResponseEntity<LibrarianResponse> getDefaultOrActive(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return ResponseEntity.ok(librarianService.getActiveOrDefaultLibrarian(date));
+    // Toggle librarian active status
+    @PutMapping("/{id}/toggle-active")
+    public ResponseEntity<MessageResponse> toggleLibrarianActiveStatus(@PathVariable Long id) {
+        return ResponseEntity.ok(librarianService.toggleLibrarianActiveStatus(id));
     }
 }

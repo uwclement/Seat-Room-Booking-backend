@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,66 +24,114 @@ import org.springframework.web.bind.annotation.RestController;
 import com.auca.library.dto.request.RecurringClosureRequest;
 import com.auca.library.dto.response.LibraryClosureExceptionResponse;
 import com.auca.library.dto.response.LibraryScheduleResponse;
+import com.auca.library.dto.response.LibraryStatusResponse;
 import com.auca.library.dto.response.MessageResponse;
+import com.auca.library.model.Location;
+import com.auca.library.model.User;
 import com.auca.library.service.LibraryScheduleService;
+import com.auca.library.service.UserService;
 
 import jakarta.validation.Valid;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
 @RequestMapping("/api/admin/schedule")
-@PreAuthorize("hasRole('ADMIN') or hasRole('LIBRARIAN') ")
+@PreAuthorize("hasRole('ADMIN') or hasRole('LIBRARIAN')")
 public class AdminLibraryScheduleController {
 
     @Autowired
     private LibraryScheduleService libraryScheduleService;
 
-    // Get all regular library schedules
+    @Autowired
+    private UserService userService;
+
+    // Helper method to get current user
+    private User getCurrentUser(Authentication auth) {
+        // Replace this with your existing method to get current user
+        // For example: return userService.getCurrentUser(auth);
+        // or: return (User) auth.getPrincipal();
+        // or: return userService.findByUsername(auth.getName());
+        
+        // Temporary implementation - replace with your actual method
+        return userService.findByEmail(auth.getName()).orElseThrow();
+    }
+
+    // Get library schedules (all for admin, location-specific for librarian)
     @GetMapping
-    public ResponseEntity<List<LibraryScheduleResponse>> getAllSchedules() {
-        return ResponseEntity.ok(libraryScheduleService.getAllLibrarySchedules());
+    public ResponseEntity<List<LibraryScheduleResponse>> getAllSchedules(Authentication auth) {
+        User currentUser = getCurrentUser(auth);
+        
+        if (currentUser.isAdmin()) {
+            return ResponseEntity.ok(libraryScheduleService.getAllLibrarySchedules());
+        } else {
+            // Librarian sees only their location schedules
+            return ResponseEntity.ok(libraryScheduleService.getLibrarySchedulesByLocation(currentUser.getLocation()));
+        }
+    }
+
+    // Get schedules for specific location (admin only)
+    @GetMapping("/location/{location}")
+    public ResponseEntity<List<LibraryScheduleResponse>> getSchedulesByLocation(@PathVariable Location location) {
+        return ResponseEntity.ok(libraryScheduleService.getLibrarySchedulesByLocation(location));
     }
 
     // Update a regular day schedule
     @PutMapping("/{id}")
     public ResponseEntity<LibraryScheduleResponse> updateSchedule(
             @PathVariable Long id,
-            @Valid @RequestBody LibraryScheduleResponse scheduleResponse) {
-        return ResponseEntity.ok(libraryScheduleService.updateLibrarySchedule(id, scheduleResponse));
+            @Valid @RequestBody LibraryScheduleResponse scheduleResponse,
+            Authentication auth) {
+        User currentUser = getCurrentUser(auth);
+        return ResponseEntity.ok(libraryScheduleService.updateLibrarySchedule(id, scheduleResponse, currentUser));
     }
 
     // Mark a day as completely closed
     @PutMapping("/{id}/close")
     public ResponseEntity<LibraryScheduleResponse> setDayClosed(
             @PathVariable Long id,
-            @RequestBody Map<String, String> requestBody) {
+            @RequestBody Map<String, String> requestBody,
+            Authentication auth) {
         String message = requestBody.getOrDefault("message", "Library closed");
-        return ResponseEntity.ok(libraryScheduleService.setDayClosed(id, message));
+        User currentUser = getCurrentUser(auth);
+        return ResponseEntity.ok(libraryScheduleService.setDayClosed(id, message, currentUser));
     }
 
     // Set special closing time for a day
     @PutMapping("/{id}/special-close")
     public ResponseEntity<LibraryScheduleResponse> setSpecialClosingTime(
             @PathVariable Long id,
-            @RequestBody Map<String, String> requestBody) {
+            @RequestBody Map<String, String> requestBody,
+            Authentication auth) {
         String timeStr = requestBody.get("specialCloseTime");
         String message = requestBody.getOrDefault("message", "Early closing today");
 
         LocalTime specialCloseTime = LocalTime.parse(timeStr);
-        return ResponseEntity.ok(libraryScheduleService.setSpecialClosingTime(id, specialCloseTime, message));
+        User currentUser = getCurrentUser(auth);
+        return ResponseEntity.ok(libraryScheduleService.setSpecialClosingTime(id, specialCloseTime, message, currentUser));
     }
 
     // Remove special closing time
     @DeleteMapping("/{id}/special-close")
-    public ResponseEntity<LibraryScheduleResponse> removeSpecialClosingTime(@PathVariable Long id) {
-        return ResponseEntity.ok(libraryScheduleService.removeSpecialClosingTime(id));
+    public ResponseEntity<LibraryScheduleResponse> removeSpecialClosingTime(
+            @PathVariable Long id, 
+            Authentication auth) {
+        User currentUser = getCurrentUser(auth);
+        return ResponseEntity.ok(libraryScheduleService.removeSpecialClosingTime(id, currentUser));
     }
 
-    // // Get current library status
-    // @GetMapping("/status")
-    // public ResponseEntity<LibraryStatusResponse> getCurrentStatus() {
-    // return ResponseEntity.ok(libraryScheduleService.getCurrentLibraryStatus());
-    // }
+    // Get current library status for user's location
+    @GetMapping("/status")
+    public ResponseEntity<LibraryStatusResponse> getCurrentStatus(Authentication auth) {
+        User currentUser = getCurrentUser(auth);
+        return ResponseEntity.ok(libraryScheduleService.getCurrentLibraryStatus(currentUser.getLocation()));
+    }
+
+    // Get current library status for specific location (admin only)
+    @GetMapping("/status/{location}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<LibraryStatusResponse> getCurrentStatusByLocation(@PathVariable Location location) {
+        return ResponseEntity.ok(libraryScheduleService.getCurrentLibraryStatus(location));
+    }
 
     // Get all closure exceptions
     @GetMapping("/exceptions")

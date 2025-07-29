@@ -1,13 +1,16 @@
 package com.auca.library.dto.request;
 
+import java.time.DayOfWeek;
+import java.util.HashSet;
+import java.util.Set;
+
 import com.auca.library.model.Location;
+
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
-
-import java.time.LocalDate;
 
 @Data
 public class StaffCreationRequest {
@@ -35,7 +38,33 @@ public class StaffCreationRequest {
     private String role; // LIBRARIAN, ADMIN, EQUIPMENT_ADMIN, HOD
 
     // Librarian based fields
-    private LocalDate workingDay;
-    private boolean activeToday = false;
-    private boolean isDefault = false;
+    private Set<DayOfWeek> workingDays;
+    private boolean activeThisWeek = false;
+    private boolean defaultLibrarian = false;
+     
+       public boolean isDefaultLibrarian() {
+        return defaultLibrarian;
+    }
+    
+    public void setDefaultLibrarian(boolean defaultLibrarian) {
+        this.defaultLibrarian = defaultLibrarian;
+    }
+    
+    // For backward compatibility, if needed
+    public boolean isDefault() {
+        return defaultLibrarian;
+    }
+    
+    public void setDefault(boolean isDefault) {
+        this.defaultLibrarian = isDefault;
+    }
+    
+    public boolean isActiveThisWeek() {
+        return activeThisWeek;
+    }
+
+    public void setActiveThisWeek(boolean activeThisWeek) {
+        this.activeThisWeek = activeThisWeek;
+    }
+    
 }

@@ -9,7 +9,8 @@ public class LibraryScheduleResponse {
     private String dayOfWeek;
     private String openTime;
     private String closeTime;
-    private Boolean isOpen;           
+    private Boolean isOpen; 
+    private String location;          
     private String specialCloseTime;  
     private String message;           
     private LocalDateTime lastModified; 

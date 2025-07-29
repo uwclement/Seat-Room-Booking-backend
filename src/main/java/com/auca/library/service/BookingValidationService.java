@@ -1,19 +1,24 @@
 package com.auca.library.service;
 
-import com.auca.library.dto.request.RoomBookingRequest;
-import com.auca.library.exception.BookingConflictException;
-import com.auca.library.exception.BookingLimitExceededException;
-import com.auca.library.model.*;
-import com.auca.library.repository.*;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.auca.library.dto.request.RoomBookingRequest;
+import com.auca.library.exception.BookingConflictException;
+import com.auca.library.exception.BookingLimitExceededException;
+import com.auca.library.model.Room;
+import com.auca.library.model.RoomBooking;
+import com.auca.library.model.User;
+import com.auca.library.model.Seat;
+import com.auca.library.repository.RecurringBookingSeriesRepository;
+import com.auca.library.repository.RoomBookingRepository;
 
 @Service
 public class BookingValidationService {
@@ -22,9 +27,9 @@ public class BookingValidationService {
     @Autowired private LibraryScheduleService libraryScheduleService;
     @Autowired private RecurringBookingSeriesRepository recurringSeriesRepository;
     
-    public void validateBookingRequest(RoomBookingRequest request, User user, Room room) {
+    public void validateBookingRequest(RoomBookingRequest request, User user, Room room, Seat seat) {
         validateBookingTimes(request, room);
-        validateLibrarySchedule(request);
+        validateLibrarySchedule(request, seat);
         validateUserBookingLimits(request, user, room);
         validateRoomCapacity(request, room);
         validateBookingWindow(request);
@@ -62,15 +67,15 @@ public class BookingValidationService {
         }
     }
     
-    private void validateLibrarySchedule(RoomBookingRequest request) {
+    private void validateLibrarySchedule(RoomBookingRequest request, Seat seat) {
         LocalDate bookingDate = request.getStartTime().toLocalDate();
         
         // Check if library is open on booking date
-        if (!libraryScheduleService.isLibraryOpenAt(bookingDate, request.getStartTime().toLocalTime())) {
+        if (!libraryScheduleService.isLibraryOpenAt(bookingDate, request.getStartTime().toLocalTime(), seat.getLocation() )) {
             throw new BookingConflictException("Library is closed at the requested start time");
         }
         
-        if (!libraryScheduleService.isLibraryOpenAt(bookingDate, request.getEndTime().toLocalTime())) {
+        if (!libraryScheduleService.isLibraryOpenAt(bookingDate, request.getEndTime().toLocalTime(), seat.getLocation())) {
             throw new BookingConflictException("Library is closed at the requested end time");
         }
         
@@ -78,7 +83,7 @@ public class BookingValidationService {
         if (!libraryScheduleService.isValidBookingTime(
                 bookingDate, 
                 request.getStartTime().toLocalTime(), 
-                request.getEndTime().toLocalTime())) {
+                request.getEndTime().toLocalTime(), seat.getLocation() )) {
             throw new BookingConflictException("Booking time is outside library operating hours");
         }
     }

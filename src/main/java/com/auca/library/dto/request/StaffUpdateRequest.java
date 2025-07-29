@@ -1,6 +1,7 @@
 package com.auca.library.dto.request;
 
-import java.time.LocalDate;
+import java.time.DayOfWeek;
+import java.util.Set;
 
 import com.auca.library.model.Location;
 
@@ -33,7 +34,33 @@ public class StaffUpdateRequest {
     private Location location;
 
     // Librarian-specific fields
-    private LocalDate workingDay;
-    private boolean activeToday = false;
-    private boolean isDefault = false;
+    private Set<DayOfWeek> workingDays;
+    private boolean activeThisWeek = false;
+    private boolean defaultLibrarian = false;
+    
+    // Getter/Setter methods
+    public boolean isDefaultLibrarian() {
+        return defaultLibrarian;
+    }
+    
+    public void setDefaultLibrarian(boolean defaultLibrarian) {
+        this.defaultLibrarian = defaultLibrarian;
+    }
+    
+    // For backward compatibility
+    public boolean isDefault() {
+        return defaultLibrarian;
+    }
+    
+    public void setDefault(boolean isDefault) {
+        this.defaultLibrarian = isDefault;
+    }
+    
+    public boolean isActiveThisWeek() {
+        return activeThisWeek;
+    }
+    
+    public void setActiveThisWeek(boolean activeThisWeek) {
+        this.activeThisWeek = activeThisWeek;
+    }
 }

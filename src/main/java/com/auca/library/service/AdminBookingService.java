@@ -20,6 +20,7 @@ import com.auca.library.dto.response.MessageResponse;
 import com.auca.library.exception.ResourceNotFoundException;
 import com.auca.library.model.Booking;
 import com.auca.library.model.Booking.BookingStatus;
+import com.auca.library.model.Location;
 import com.auca.library.model.WaitList;
 import com.auca.library.repository.BookingRepository;
 import com.auca.library.repository.WaitListRepository;
@@ -44,14 +45,29 @@ public class AdminBookingService {
     @Autowired
     private NotificationService notificationService;
 
-    public List<BookingResponse> getCurrentBookings() {
-        LocalDateTime now = LocalDateTime.now();
-        List<Booking> currentBookings = bookingRepository.findByEndTimeAfterAndStartTimeBeforeAndStatusIn(
-                now, now, List.of(BookingStatus.RESERVED, BookingStatus.CHECKED_IN));
+    public List<BookingResponse> getCurrentBookings(Location location) {
+        LocalDate today = LocalDate.now();
+        LocalDateTime startOfDay = today.atStartOfDay();
+        LocalDateTime endOfDay = today.atTime(LocalTime.MAX);
+
+        List<Booking> bookings;
+
+         
+         if (location != null) {
+              bookings = bookingRepository.findTodaysActiveBookingsByLocation(
+                location, startOfDay, endOfDay,
+                List.of(BookingStatus.RESERVED, BookingStatus.CHECKED_IN)
+             );
+           } else {
+               bookings = bookingRepository.findTodaysActiveBookings(
+               startOfDay, endOfDay,
+              List.of(BookingStatus.RESERVED, BookingStatus.CHECKED_IN)
+            );
+        }
         
-        return currentBookings.stream()
-                .map(this::mapBookingToResponse)
-                .collect(Collectors.toList());
+           return bookings.stream()
+            .map(this::mapBookingToResponse)
+            .collect(Collectors.toList());
     }
 
 public List<BookingResponse> getBookingsByDate(LocalDate date) {
@@ -144,6 +160,7 @@ public Map<String, Long> getTodaysBookingStats() {
         response.setId(booking.getId());
         response.setUserId(booking.getUser().getId());
         response.setUserName(booking.getUser().getFullName());
+        response.setIdentifier(booking.getUser().getIdentifier());
         response.setSeatId(booking.getSeat().getId());
         response.setSeatNumber(booking.getSeat().getSeatNumber());
         response.setStartTime(booking.getStartTime());
@@ -207,6 +224,7 @@ public BookingDTO markAsNoShow(Long id, String cancellationReason) {
         dto.setId(booking.getId());
         dto.setUserId(booking.getUser().getId());
         dto.setUserName(booking.getUser().getFullName());
+        dto.setIdentifier(booking.getUser().getIdentifier());
         dto.setSeatId(booking.getSeat().getId());
         dto.setSeatNumber(booking.getSeat().getSeatNumber());
         dto.setZoneType(booking.getSeat().getZoneType());

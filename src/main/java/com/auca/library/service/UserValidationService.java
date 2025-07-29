@@ -67,40 +67,40 @@ public class UserValidationService {
         }
     }
 
-    public void validateLibrarianConstraints(Long userId, boolean isActiveToday, 
-                                           boolean isDefault, java.time.LocalDate workingDay) {
-        // Check active librarian limit
-        if (isActiveToday && workingDay != null) {
-            long activeCount = userRepository.countActiveLibrariansForDay(workingDay);
+    // public void validateLibrarianConstraints(Long userId, boolean isActiveToday, 
+    //                                        boolean isDefault, java.time.LocalDate workingDay) {
+    //     // Check active librarian limit
+    //     if (isActiveToday && workingDay != null) {
+    //         long activeCount = userRepository.countActiveLibrariansForDay(workingDay);
             
-            // If updating existing user, don't count current user
-            if (userId != null) {
-                User currentUser = userRepository.findById(userId).orElse(null);
-                if (currentUser != null && currentUser.isActiveToday()) {
-                    activeCount--;
-                }
-            }
+    //         // If updating existing user, don't count current user
+    //         if (userId != null) {
+    //             User currentUser = userRepository.findById(userId).orElse(null);
+    //             if (currentUser != null && currentUser.isActiveToday()) {
+    //                 activeCount--;
+    //             }
+    //         }
             
-            if (activeCount >= 2) {
-                throw new IllegalStateException("Only 2 librarians can be active per day");
-            }
-        }
+    //         if (activeCount >= 2) {
+    //             throw new IllegalStateException("Only 2 librarians can be active per day");
+    //         }
+    //     }
 
-        // Handle default librarian logic
-        if (isDefault) {
-            User currentDefault = userRepository.findDefaultLibrarian().orElse(null);
-            if (currentDefault != null && !currentDefault.getId().equals(userId)) {
-                // Will need to update the existing default librarian
-                // This is handled in the service layer
-            }
-        }
-    }
+    //     // Handle default librarian logic
+    //     if (isDefault) {
+    //         User currentDefault = userRepository.findDefaultLibrarian().orElse(null);
+    //         if (currentDefault != null && !currentDefault.getId().equals(userId)) {
+    //             // Will need to update the existing default librarian
+    //             // This is handled in the service layer
+    //         }
+    //     }
+    // }
 
     public void validateUserDeletion(User user) {
         List<String> errors = new ArrayList<>();
 
         // Prevent deletion of default librarian without replacement
-        if (user.isLibrarian() && user.isDefault()) {
+        if (user.isLibrarian() && user.isActiveToday()) {
             errors.add("Cannot delete default librarian. Please set another librarian as default first");
         }
 

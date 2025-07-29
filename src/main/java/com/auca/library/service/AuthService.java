@@ -1,6 +1,7 @@
 package com.auca.library.service;
 
 import java.security.SecureRandom;
+import java.time.DayOfWeek;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -142,25 +143,28 @@ public class AuthService {
 
         // Set librarian based fields if applicable
         if (roleEnum == Role.ERole.ROLE_LIBRARIAN) {
-            user.setWorkingDay(request.getWorkingDay());
-            user.setActiveToday(request.isActiveToday());
+            user.setWorkingDays(request.getWorkingDays());
+            user.setActiveThisWeek(request.isActiveThisWeek());
             
             // Handle default librarian logic
-            if (request.isDefault()) {
+            if (request.isDefaultLibrarian()) {
                 // Remove default status from existing default librarian
-                userRepository.findDefaultLibrarian().ifPresent(existing -> {
-                    existing.setIsDefault(false);
+                userRepository.findDefaultLibrarianByLocation(request.getLocation()).ifPresent(existing -> {
+                    existing.setDefaultLibrarian(false);
                     userRepository.save(existing);
                 });
-                user.setIsDefault(true);
+                user.setDefaultLibrarian(true);
             }
 
             // Check active librarian limit
-            if (request.isActiveToday() && request.getWorkingDay() != null) {
-                long activeCount = userRepository.countActiveLibrariansForDay(request.getWorkingDay());
-                if (activeCount >= 2) {
-                    throw new IllegalStateException("Only 2 librarians can be active per day.");
+             if (request.isActiveThisWeek() && request.getWorkingDays() != null) {
+                   for (DayOfWeek day : request.getWorkingDays()) {
+                    long activeCount = userRepository.countActiveLibrariansByDayAndLocation(day, request.getLocation());
+                   if (activeCount >= 2) {
+                    throw new IllegalStateException("Only 2 librarians can be active on " + day + " at " + request.getLocation().getDisplayName());
+                   }
                 }
+            
             }
         }
 
@@ -195,6 +199,7 @@ public class AuthService {
                 userDetails.getFullName(),
                 userDetails.getEmail(),
                 identifier,
+                userDetails.getLocation().toString(),
                 userType,
                 userDetails.isEmailVerified(),
                 user.isMustChangePassword(),

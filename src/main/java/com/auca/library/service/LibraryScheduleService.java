@@ -7,6 +7,8 @@ import com.auca.library.dto.response.MessageResponse;
 import com.auca.library.exception.ResourceNotFoundException;
 import com.auca.library.model.LibraryClosureException;
 import com.auca.library.model.LibrarySchedule;
+import com.auca.library.model.Location;
+import com.auca.library.model.User;
 import com.auca.library.repository.LibraryClosureExceptionRepository;
 import com.auca.library.repository.LibraryScheduleRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,16 +36,37 @@ public class LibraryScheduleService {
 
     private String scheduleMessage;
 
+    // Get schedules for specific location
+    public List<LibraryScheduleResponse> getLibrarySchedulesByLocation(Location location) {
+        return scheduleRepository.findByLocationOrderByDayOfWeek(location).stream()
+                .map(this::mapScheduleToResponse)
+                .collect(Collectors.toList());
+    }
+
+    // Get all schedules (admin only) - now includes location filtering capability
     public List<LibraryScheduleResponse> getAllLibrarySchedules() {
         return scheduleRepository.findAll().stream()
                 .map(this::mapScheduleToResponse)
                 .collect(Collectors.toList());
     }
 
+    // Overloaded method for backward compatibility
+    public List<LibraryScheduleResponse> getAllLibrarySchedules(Location location) {
+        if (location != null) {
+            return getLibrarySchedulesByLocation(location);
+        }
+        return getAllLibrarySchedules();
+    }
+
     @Transactional
-    public LibraryScheduleResponse updateLibrarySchedule(Long id, LibraryScheduleResponse scheduleResponse) {
+    public LibraryScheduleResponse updateLibrarySchedule(Long id, LibraryScheduleResponse scheduleResponse, User currentUser) {
         LibrarySchedule schedule = scheduleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Library schedule not found with id: " + id));
+
+        // Permission check: Admin can edit all, Librarian can edit only their location
+        if (!currentUser.isAdmin() && !schedule.getLocation().equals(currentUser.getLocation())) {
+            throw new RuntimeException("You can only edit schedules for your library location");
+        }
 
         if (scheduleResponse.getOpenTime() != null) {
             schedule.setOpenTime(LocalTime.parse(scheduleResponse.getOpenTime()));
@@ -71,41 +94,53 @@ public class LibraryScheduleService {
         return mapScheduleToResponse(schedule);
     }
 
-    // Set a day as completely closed
     @Transactional
-    public LibraryScheduleResponse setDayClosed(Long id, String message) {
+    public LibraryScheduleResponse setDayClosed(Long id, String message, User currentUser) {
         LibrarySchedule schedule = scheduleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Library schedule not found with id: " + id));
+
+        // Permission check
+        if (!currentUser.isAdmin() && !schedule.getLocation().equals(currentUser.getLocation())) {
+            throw new RuntimeException("You can only edit schedules for your library location");
+        }
 
         schedule.setOpen(false);
         schedule.setMessage(message);
-        schedule.setSpecialCloseTime(null); // Clear any special closing time
+        schedule.setSpecialCloseTime(null);
         schedule.setLastModified(LocalDateTime.now());
 
         schedule = scheduleRepository.save(schedule);
         return mapScheduleToResponse(schedule);
     }
 
-    // Set special closing time for a day
     @Transactional
-    public LibraryScheduleResponse setSpecialClosingTime(Long id, LocalTime specialCloseTime, String message) {
+    public LibraryScheduleResponse setSpecialClosingTime(Long id, LocalTime specialCloseTime, String message, User currentUser) {
         LibrarySchedule schedule = scheduleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Library schedule not found with id: " + id));
+
+        // Permission check
+        if (!currentUser.isAdmin() && !schedule.getLocation().equals(currentUser.getLocation())) {
+            throw new RuntimeException("You can only edit schedules for your library location");
+        }
 
         schedule.setSpecialCloseTime(specialCloseTime);
         schedule.setMessage(message);
-        schedule.setOpen(true); // Ensure the day is marked as open
+        schedule.setOpen(true);
         schedule.setLastModified(LocalDateTime.now());
 
         schedule = scheduleRepository.save(schedule);
         return mapScheduleToResponse(schedule);
     }
 
-    // Remove special closing time
     @Transactional
-    public LibraryScheduleResponse removeSpecialClosingTime(Long id) {
+    public LibraryScheduleResponse removeSpecialClosingTime(Long id, User currentUser) {
         LibrarySchedule schedule = scheduleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Library schedule not found with id: " + id));
+
+        // Permission check
+        if (!currentUser.isAdmin() && !schedule.getLocation().equals(currentUser.getLocation())) {
+            throw new RuntimeException("You can only edit schedules for your library location");
+        }
 
         schedule.setSpecialCloseTime(null);
         schedule.setMessage(null);
@@ -115,8 +150,8 @@ public class LibraryScheduleService {
         return mapScheduleToResponse(schedule);
     }
 
-    // Get current library status
-    public LibraryStatusResponse getCurrentLibraryStatus() {
+    // Get current library status for specific location
+    public LibraryStatusResponse getCurrentLibraryStatus(Location location) {
         LocalDateTime now = LocalDateTime.now();
         LocalDate today = now.toLocalDate();
         LocalTime currentTime = now.toLocalTime();
@@ -132,23 +167,22 @@ public class LibraryScheduleService {
                 status.setMessage(exception.getReason());
                 return status;
             } else if (exception.getOpenTime() != null && exception.getCloseTime() != null) {
-                // Handle modified hours for the day
                 boolean isOpen = !currentTime.isBefore(exception.getOpenTime()) &&
                         currentTime.isBefore(exception.getCloseTime());
                 status.setOpen(isOpen);
                 status.setCurrentHours(exception.getOpenTime() + " - " + exception.getCloseTime());
                 status.setMessage(exception.getReason());
                 status.setNextStatusChange(
-                        getNextStatusChangeTime(now, exception.getOpenTime(), exception.getCloseTime()));
+                        getNextStatusChangeTime(now, exception.getOpenTime(), exception.getCloseTime(), location));
                 return status;
             }
         }
 
-        // Check regular schedule
-        LibrarySchedule schedule = scheduleRepository.findByDayOfWeek(today.getDayOfWeek()).orElse(null);
+        // Check regular schedule for the location
+        LibrarySchedule schedule = scheduleRepository.findByDayOfWeekAndLocation(today.getDayOfWeek(), location).orElse(null);
         if (schedule == null) {
             status.setOpen(false);
-            status.setMessage("No schedule configured for " + today.getDayOfWeek());
+            status.setMessage("No schedule configured for " + today.getDayOfWeek() + " at " + location.getDisplayName());
             return status;
         }
 
@@ -164,7 +198,7 @@ public class LibraryScheduleService {
         status.setOpen(isOpen);
         status.setCurrentHours(schedule.getOpenTime() + " - " + effectiveCloseTime);
         status.setMessage(schedule.getMessage());
-        status.setNextStatusChange(getNextStatusChangeTime(now, schedule.getOpenTime(), effectiveCloseTime));
+        status.setNextStatusChange(getNextStatusChangeTime(now, schedule.getOpenTime(), effectiveCloseTime, location));
 
         if (schedule.getSpecialCloseTime() != null) {
             status.setSpecialMessage("Closing early today at " + schedule.getSpecialCloseTime());
@@ -173,56 +207,101 @@ public class LibraryScheduleService {
         return status;
     }
 
-    // NEW: Check if library is open at specific date and time
-    public boolean isLibraryOpenAt(LocalDate date, LocalTime time) {
+    // Check if library is open at specific date and time for location
+    public boolean isLibraryOpenAt(LocalDate date, LocalTime time, Location location) {
+    // Add logging to debug
+    System.out.println("Checking library schedule for: " + date.getDayOfWeek() + " at " + location);
+    
+    // Check for closure exceptions first
+    LibraryClosureException exception = exceptionRepository.findByDate(date).orElse(null);
+    if (exception != null) {
+        System.out.println("Found closure exception: " + exception);
+        if (exception.isClosedAllDay()) {
+            return false;
+        } else if (exception.getOpenTime() != null && exception.getCloseTime() != null) {
+            return !time.isBefore(exception.getOpenTime()) && time.isBefore(exception.getCloseTime());
+        }
+    }
+
+    // Check regular schedule
+    LibrarySchedule schedule = scheduleRepository.findByDayOfWeekAndLocation(date.getDayOfWeek(), location).orElse(null);
+    System.out.println("Found schedule: " + schedule);
+    
+    if (schedule == null || !schedule.isOpen()) {
+        System.out.println("No schedule found or library is closed on " + date.getDayOfWeek());
+        return false;
+    }
+
+    boolean isOpen = schedule.isOpenAt(time);
+    System.out.println("Is open at " + time + ": " + isOpen);
+    return isOpen;
+}
+
+    // Validate booking time for specific location
+    public boolean isValidBookingTime(LocalDate date, LocalTime startTime, LocalTime endTime, Location location) {
+        return isLibraryOpenAt(date, startTime, location) && isLibraryOpenAt(date, endTime, location);
+    }
+
+    // Check if library is open on a specific date for location
+    public boolean isLibraryOpen(LocalDate date, Location location) {
+        // Check for closure exceptions first
+        LibraryClosureException exception = exceptionRepository.findByDate(date).orElse(null);
+        if (exception != null) {
+            return !exception.isClosedAllDay();
+        }
+
+        // Check regular schedule
+        LibrarySchedule schedule = scheduleRepository.findByDayOfWeekAndLocation(date.getDayOfWeek(), location).orElse(null);
+        return schedule != null && schedule.isOpen();
+    }
+
+    // Get library operating hours for a specific date and location
+    public String getLibraryHours(LocalDate date, Location location) {
         // Check for closure exceptions first
         LibraryClosureException exception = exceptionRepository.findByDate(date).orElse(null);
         if (exception != null) {
             if (exception.isClosedAllDay()) {
-                return false;
+                return "Closed";
             } else if (exception.getOpenTime() != null && exception.getCloseTime() != null) {
-                return !time.isBefore(exception.getOpenTime()) && time.isBefore(exception.getCloseTime());
+                return exception.getOpenTime().format(DateTimeFormatter.ofPattern("HH:mm")) + 
+                       " - " + 
+                       exception.getCloseTime().format(DateTimeFormatter.ofPattern("HH:mm"));
             }
         }
 
         // Check regular schedule
-        LibrarySchedule schedule = scheduleRepository.findByDayOfWeek(date.getDayOfWeek()).orElse(null);
+        LibrarySchedule schedule = scheduleRepository.findByDayOfWeekAndLocation(date.getDayOfWeek(), location).orElse(null);
         if (schedule == null || !schedule.isOpen()) {
-            return false;
+            return "Closed";
         }
 
-        return schedule.isOpenAt(time);
-    }
-
-    // NEW: Validate if a booking time period is within library hours
-    public boolean isValidBookingTime(LocalDate date, LocalTime startTime, LocalTime endTime) {
-        return isLibraryOpenAt(date, startTime) && isLibraryOpenAt(date, endTime);
+        LocalTime effectiveCloseTime = schedule.getEffectiveCloseTime();
+        return schedule.getOpenTime().format(DateTimeFormatter.ofPattern("HH:mm")) + 
+               " - " + 
+               effectiveCloseTime.format(DateTimeFormatter.ofPattern("HH:mm"));
     }
 
     // Helper method to calculate next status change time
-    private LocalDateTime getNextStatusChangeTime(LocalDateTime now, LocalTime openTime, LocalTime closeTime) {
+    private LocalDateTime getNextStatusChangeTime(LocalDateTime now, LocalTime openTime, LocalTime closeTime, Location location) {
         LocalDate today = now.toLocalDate();
         LocalTime currentTime = now.toLocalTime();
 
         if (currentTime.isBefore(openTime)) {
-            // Library is closed, next change is opening time
             return today.atTime(openTime);
         } else if (currentTime.isBefore(closeTime)) {
-            // Library is open, next change is closing time
             return today.atTime(closeTime);
         } else {
-            // Library is closed, next change is tomorrow's opening
-            LibrarySchedule nextSchedule = scheduleRepository.findByDayOfWeek(
-                    today.plusDays(1).getDayOfWeek()).orElse(null);
+            LibrarySchedule nextSchedule = scheduleRepository.findByDayOfWeekAndLocation(
+                    today.plusDays(1).getDayOfWeek(), location).orElse(null);
 
             if (nextSchedule != null && nextSchedule.isOpen()) {
                 return today.plusDays(1).atTime(nextSchedule.getOpenTime());
             }
 
-            // Find next open day
+            // Find next open day for this location
             for (int i = 1; i <= 7; i++) {
                 LocalDate nextDay = today.plusDays(i);
-                LibrarySchedule schedule = scheduleRepository.findByDayOfWeek(nextDay.getDayOfWeek())
+                LibrarySchedule schedule = scheduleRepository.findByDayOfWeekAndLocation(nextDay.getDayOfWeek(), location)
                         .orElse(null);
                 if (schedule != null && schedule.isOpen()) {
                     return nextDay.atTime(schedule.getOpenTime());
@@ -233,6 +312,27 @@ public class LibraryScheduleService {
         }
     }
 
+    // Enhanced mapping method that includes location
+    private LibraryScheduleResponse mapScheduleToResponse(LibrarySchedule schedule) {
+        LibraryScheduleResponse response = new LibraryScheduleResponse();
+        response.setId(schedule.getId());
+        response.setDayOfWeek(schedule.getDayOfWeek().toString());
+        response.setOpenTime(schedule.getOpenTime().format(DateTimeFormatter.ISO_LOCAL_TIME));
+        response.setCloseTime(schedule.getCloseTime().format(DateTimeFormatter.ISO_LOCAL_TIME));
+        response.setIsOpen(schedule.isOpen());
+        response.setLocation(schedule.getLocation().toString()); // Add location to response
+
+        if (schedule.getSpecialCloseTime() != null) {
+            response.setSpecialCloseTime(schedule.getSpecialCloseTime().format(DateTimeFormatter.ISO_LOCAL_TIME));
+        }
+
+        response.setMessage(schedule.getMessage());
+        response.setLastModified(schedule.getLastModified());
+
+        return response;
+    }
+
+    // Other existing methods remain the same...
     public List<LibraryClosureExceptionResponse> getAllClosureExceptions() {
         return exceptionRepository.findAll().stream()
                 .map(this::mapExceptionToResponse)
@@ -283,30 +383,23 @@ public class LibraryScheduleService {
             LocalDate dateToAdd = null;
 
             if (recurringRequest.getDayOfWeek() != null) {
-                // If we're looking for a specific day of the week
                 if (currentDate.getDayOfWeek() != recurringRequest.getDayOfWeek()) {
-                    // Move to the next occurrence of that day of week
                     currentDate = currentDate.with(TemporalAdjusters.next(recurringRequest.getDayOfWeek()));
                     if (currentDate.isAfter(endDate)) {
                         break;
                     }
                 }
                 dateToAdd = currentDate;
-                // Move to the next week for the next iteration
                 currentDate = currentDate.plusWeeks(1);
             } else if (recurringRequest.getDayOfMonth() != null) {
-                // If we're looking for a specific day of the month
                 if (currentDate.getDayOfMonth() != recurringRequest.getDayOfMonth()) {
-                    // Try to move to that day in the current month
                     try {
                         currentDate = currentDate.withDayOfMonth(recurringRequest.getDayOfMonth());
                     } catch (Exception e) {
-                        // If that day doesn't exist in the current month, move to the next month
                         currentDate = currentDate.plusMonths(1).withDayOfMonth(1);
                         try {
                             currentDate = currentDate.withDayOfMonth(recurringRequest.getDayOfMonth());
                         } catch (Exception ex) {
-                            // If still not possible, skip this month
                             currentDate = currentDate.plusMonths(1).withDayOfMonth(1);
                             continue;
                         }
@@ -317,11 +410,8 @@ public class LibraryScheduleService {
                     }
                 }
                 dateToAdd = currentDate;
-                // Move to the next month for the next iteration
                 currentDate = currentDate.plusMonths(1);
             } else {
-                // If no specific recurrence pattern, just add the current date and move to the
-                // next day
                 dateToAdd = currentDate;
                 currentDate = currentDate.plusDays(1);
             }
@@ -401,69 +491,4 @@ public class LibraryScheduleService {
             exception.setCloseTime(null);
         }
     }
-
-    // Enhanced mapping method that includes new fields
-    private LibraryScheduleResponse mapScheduleToResponse(LibrarySchedule schedule) {
-        LibraryScheduleResponse response = new LibraryScheduleResponse();
-        response.setId(schedule.getId());
-        response.setDayOfWeek(schedule.getDayOfWeek().toString());
-        response.setOpenTime(schedule.getOpenTime().format(DateTimeFormatter.ISO_LOCAL_TIME));
-        response.setCloseTime(schedule.getCloseTime().format(DateTimeFormatter.ISO_LOCAL_TIME));
-        response.setIsOpen(schedule.isOpen());
-
-        if (schedule.getSpecialCloseTime() != null) {
-            response.setSpecialCloseTime(schedule.getSpecialCloseTime().format(DateTimeFormatter.ISO_LOCAL_TIME));
-        }
-
-        response.setMessage(schedule.getMessage());
-        response.setLastModified(schedule.getLastModified());
-
-        return response;
-    }
-
-
-
-    /**
- * Check if library is open on a specific date
- */
-public boolean isLibraryOpen(LocalDate date) {
-    // Check for closure exceptions first
-    LibraryClosureException exception = exceptionRepository.findByDate(date).orElse(null);
-    if (exception != null) {
-        return !exception.isClosedAllDay();
-    }
-
-    // Check regular schedule
-    LibrarySchedule schedule = scheduleRepository.findByDayOfWeek(date.getDayOfWeek()).orElse(null);
-    return schedule != null && schedule.isOpen();
-}
-
-/**
- * Get library operating hours for a specific date as a formatted string
- */
-public String getLibraryHours(LocalDate date) {
-    // Check for closure exceptions first
-    LibraryClosureException exception = exceptionRepository.findByDate(date).orElse(null);
-    if (exception != null) {
-        if (exception.isClosedAllDay()) {
-            return "Closed";
-        } else if (exception.getOpenTime() != null && exception.getCloseTime() != null) {
-            return exception.getOpenTime().format(DateTimeFormatter.ofPattern("HH:mm")) + 
-                   " - " + 
-                   exception.getCloseTime().format(DateTimeFormatter.ofPattern("HH:mm"));
-        }
-    }
-
-    // Check regular schedule
-    LibrarySchedule schedule = scheduleRepository.findByDayOfWeek(date.getDayOfWeek()).orElse(null);
-    if (schedule == null || !schedule.isOpen()) {
-        return "Closed";
-    }
-
-    LocalTime effectiveCloseTime = schedule.getEffectiveCloseTime();
-    return schedule.getOpenTime().format(DateTimeFormatter.ofPattern("HH:mm")) + 
-           " - " + 
-           effectiveCloseTime.format(DateTimeFormatter.ofPattern("HH:mm"));
-}
-
 }

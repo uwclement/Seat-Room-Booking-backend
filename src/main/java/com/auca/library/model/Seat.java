@@ -100,5 +100,9 @@ public class Seat {
         }
         return seatNumber;
     }
+
+     public Location getLocation() {
+        return location;
+    }
     
 }
