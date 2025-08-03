@@ -3,6 +3,7 @@ package com.auca.library.model;
 import java.util.HashSet;
 import java.util.Set;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -11,6 +12,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
@@ -49,6 +51,12 @@ public class LabClass {
 
     @Column(nullable = false)
     private boolean available = true;
+ 
+    @OneToMany(mappedBy = "labClass", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<LabRequest> labRequests = new HashSet<>();
+
+    @OneToMany(mappedBy = "labClass", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<EquipmentRequest> equipmentRequests = new HashSet<>();
 
     // Equipment available in this lab
     @ManyToMany

@@ -125,6 +125,14 @@ public class User {
     @JoinColumn(name = "approved_by_hod")
     private User approvedByHod;
 
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+    name = "user_pending_courses",
+    joinColumns = @JoinColumn(name = "user_id"),
+    inverseJoinColumns = @JoinColumn(name = "course_id")
+    )
+    private Set<Course> pendingCourses = new HashSet<>();
+
     // Constructors
     public User(String fullName, String email, String password, Location location) {
         this.fullName = fullName;

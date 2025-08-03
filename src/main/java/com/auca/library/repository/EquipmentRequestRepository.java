@@ -16,7 +16,7 @@ public interface EquipmentRequestRepository extends JpaRepository<EquipmentReque
     
     List<EquipmentRequest> findByStatus(EquipmentRequest.RequestStatus status);
     
-    @Query("SELECT er FROM EquipmentRequest er WHERE er.status = 'PENDING' ORDER BY er.createdAt ASC")
+    @Query("SELECT er FROM EquipmentRequest er WHERE er.status = com.auca.library.model.EquipmentRequest.RequestStatus.PENDING ORDER BY er.createdAt ASC")
     List<EquipmentRequest> findPendingRequests();
     
     @Query("SELECT er FROM EquipmentRequest er WHERE er.status = 'ESCALATED' ORDER BY er.escalatedAt ASC")
@@ -41,4 +41,11 @@ public interface EquipmentRequestRepository extends JpaRepository<EquipmentReque
     @Query("SELECT er FROM EquipmentRequest er WHERE er.createdAt >= :startDate AND er.createdAt <= :endDate ORDER BY er.createdAt DESC")
     List<EquipmentRequest> findRequestsInDateRange(@Param("startDate") LocalDateTime startDate, 
                                              @Param("endDate") LocalDateTime endDate);
+
+     
+                                             
+   @Query("SELECT er FROM EquipmentRequest er WHERE er.escalatedToHod = true AND er.createdAt >= :startDate AND er.createdAt <= :endDate ORDER BY er.createdAt DESC")
+   List<EquipmentRequest> findHodRequestsInDateRange(@Param("startDate") LocalDateTime startDate,
+                                                  @Param("endDate") LocalDateTime endDate);
+                                     
 }
