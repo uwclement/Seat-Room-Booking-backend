@@ -1,13 +1,15 @@
 package com.auca.library.repository;
 
-import com.auca.library.model.LabClass;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
+
+import com.auca.library.model.LabClass;
 
 @Repository
 public interface LabClassRepository extends JpaRepository<LabClass, Long> {
@@ -33,4 +35,25 @@ public interface LabClassRepository extends JpaRepository<LabClass, Long> {
     boolean isLabAvailable(@Param("labId") Long labId, 
                           @Param("startTime") LocalDateTime startTime, 
                           @Param("endTime") LocalDateTime endTime);
+       
+                          
+                          
+         @Query("""
+    SELECT CASE WHEN (COUNT(er) + COUNT(lr)) = 0 THEN true ELSE false END
+    FROM LabClass l
+    LEFT JOIN l.equipmentRequests er
+    LEFT JOIN l.labRequests lr
+    WHERE l.id = :labId
+      AND (
+        (er.status IN ('APPROVED', 'HOD_APPROVED') AND er.startTime <= :endTime AND er.endTime >= :startTime)
+        OR
+        (lr.status IN ('APPROVED', 'HOD_APPROVED') AND lr.startTime <= :endTime AND lr.endTime >= :startTime)
+      )
+    """)
+boolean isLabAvailableForBooking(
+    @Param("labId") Long labId,
+    @Param("startTime") LocalDateTime startTime,
+    @Param("endTime") LocalDateTime endTime
+);
+                 
 }

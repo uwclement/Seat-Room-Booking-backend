@@ -52,21 +52,21 @@ public class LibrarianService {
     }
 
     // Get active librarians for today (Public view)
-    // public List<PublicLibrarianResponse> getActiveLibrariansToday(Location location) {
-    //     DayOfWeek today = LocalDate.now().getDayOfWeek();
-    //     List<User> activeLibrarians = userRepository.findActiveLibrariansByDayAndLocation(today, location);
+    public List<PublicLibrarianResponse> getActiveLibrariansToday(Location location) {
+        DayOfWeek today = LocalDate.now().getDayOfWeek();
+        List<User> activeLibrarians = userRepository.findActiveLibrariansForDay(today, location);
         
-    //     if (activeLibrarians.isEmpty()) {
-    //         // Return default librarian if no active librarians
-    //         return userRepository.findDefaultLibrarianByLocation(location)
-    //                 .map(user -> List.of(mapToPublicResponse(user)))
-    //                 .orElse(List.of());
-    //     }
+        if (activeLibrarians.isEmpty()) {
+            // Return default librarian if no active librarians
+            return userRepository.findDefaultLibrarianByLocation(location)
+                    .map(user -> List.of(mapToPublicResponse(user)))
+                    .orElse(List.of());
+        }
         
-    //     return activeLibrarians.stream()
-    //             .map(this::mapToPublicResponse)
-    //             .collect(Collectors.toList());
-    // }
+        return activeLibrarians.stream()
+                .map(this::mapToPublicResponse)
+                .collect(Collectors.toList());
+    }
 
     // Get librarians scheduled for a specific day
     public List<LibrarianResponse> getLibrariansForDay(DayOfWeek dayOfWeek, Location location) {

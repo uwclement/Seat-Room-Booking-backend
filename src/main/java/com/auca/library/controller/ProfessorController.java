@@ -36,7 +36,7 @@ public class ProfessorController {
 
     @GetMapping("courses/active")
     public ResponseEntity<List<CourseResponse>> getAllCourses() {
-        List<CourseResponse> courses = courseService.getAllCourses();
+        List<CourseResponse> courses = courseService.getActiveCourses();
         return ResponseEntity.ok(courses);
     }
     // Request course approval
@@ -75,7 +75,7 @@ public class ProfessorController {
     }
 
     @PostMapping("/{professorId}/approve-courses")
-    @PreAuthorize("hasRole('HOD') or  hasRole('PROFESSOR') ")
+    @PreAuthorize("hasRole('HOD')")
     public ResponseEntity<MessageResponse> approveProfessorCourses(
             @PathVariable Long professorId,
             @RequestBody List<Long> courseIds,
@@ -83,4 +83,13 @@ public class ProfessorController {
         MessageResponse response = professorService.approveProfessorCourses(professorId, courseIds, authentication.getName());
         return ResponseEntity.ok(response);
     }
+
+
+    // Get professors with pending course requests
+    @GetMapping("/pending-course-requests")
+    @PreAuthorize("hasRole('ROLE_HOD')")
+    public ResponseEntity<List<ProfessorResponse>> getProfessorsWithPendingCourses() {
+        List<ProfessorResponse> professors = professorService.getProfessorsWithPendingCourses();
+        return ResponseEntity.ok(professors);
+   }
 }

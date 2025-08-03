@@ -46,7 +46,7 @@ public class ProfessorService {
                 .collect(Collectors.toSet());
         
         // Add courses to professor's pending list (for HOD approval)
-        professor.getApprovedCourses().addAll(requestedCourses);
+        professor.getPendingCourses().addAll(requestedCourses);
         userRepository.save(professor);
         
         // Notify HOD
@@ -122,30 +122,96 @@ public class ProfessorService {
     // Approve professor-course association (HOD)
     @Transactional
     public MessageResponse approveProfessorCourses(Long professorId, List<Long> courseIds, String hodEmail) {
-        User professor = findUserById(professorId);
-        User hod = findUserByEmail(hodEmail);
-        
-        Set<Course> approvedCourses = courseIds.stream()
-                .map(this::findCourseById)
-                .collect(Collectors.toSet());
-        
-        professor.getApprovedCourses().clear();
-        professor.getApprovedCourses().addAll(approvedCourses);
-        userRepository.save(professor);
-        
-        String courseNames = approvedCourses.stream()
-                .map(Course::getCourseName)
-                .collect(Collectors.joining(", "));
-        
-        notificationService.addNotification(
-            professor.getEmail(),
-            "Courses Approved",
-            String.format("Your courses have been approved: %s", courseNames),
-            "PROFESSOR_COURSES_APPROVED"
-        );
-        
-        return new MessageResponse("Professor courses approved successfully");
+    User professor = findUserById(professorId);
+    User hod = findUserByEmail(hodEmail);
+    
+    // Validate HOD role
+    if (!hasRole(hod, "ROLE_HOD")) {
+        throw new IllegalArgumentException("Only HOD can approve professor courses");
     }
+    
+    Set<Course> coursesToApprove = courseIds.stream()
+            .map(this::findCourseById)
+            .collect(Collectors.toSet());
+    
+    // Move from pending to approved
+    professor.getPendingCourses().removeAll(coursesToApprove);
+    professor.getApprovedCourses().addAll(coursesToApprove);
+    
+    userRepository.save(professor);
+    
+    String courseNames = coursesToApprove.stream()
+            .map(Course::getCourseName)
+            .collect(Collectors.joining(", "));
+    
+    notificationService.addNotification(
+        professor.getEmail(),
+        "Courses Approved",
+        String.format("Your courses have been approved by HOD: %s", courseNames),
+        "PROFESSOR_COURSES_APPROVED"
+    );
+    
+    return new MessageResponse("Professor courses approved successfully");
+}
+
+// Add helper method for role checking
+private boolean hasRole(User user, String roleName) {
+    return user.getRoles().stream()
+            .anyMatch(role -> role.getName().name().equals(roleName));
+}
+
+
+    // Get professors with pending course requests (HOD)
+public List<ProfessorResponse> getProfessorsWithPendingCourses() {
+    List<User> professors = userRepository.findApprovedProfessors();
+    return professors.stream()
+            .filter(prof -> !prof.getPendingCourses().isEmpty())
+            .map(this::mapToProfessorResponseWithPending)
+            .collect(Collectors.toList());
+}
+
+// Enhanced mapping method
+private ProfessorResponse mapToProfessorResponseWithPending(User professor) {
+    ProfessorResponse response = mapToProfessorResponse(professor);
+    
+    // Add pending courses info
+    response.setPendingCourseIds(professor.getPendingCourses().stream()
+            .map(Course::getId)
+            .collect(Collectors.toList()));
+    response.setPendingCourseNames(professor.getPendingCourses().stream()
+            .map(Course::getCourseName)
+            .collect(Collectors.toList()));
+    
+    return response;
+}
+
+    @Transactional
+public MessageResponse rejectProfessorCourses(Long professorId, List<Long> courseIds, String rejectionReason, String hodEmail) {
+    User professor = findUserById(professorId);
+    User hod = findUserByEmail(hodEmail);
+    
+    Set<Course> coursesToReject = courseIds.stream()
+            .map(this::findCourseById)
+            .collect(Collectors.toSet());
+    
+    // Remove from pending (reject)
+    professor.getPendingCourses().removeAll(coursesToReject);
+    userRepository.save(professor);
+    
+    String courseNames = coursesToReject.stream()
+            .map(Course::getCourseName)
+            .collect(Collectors.joining(", "));
+    
+    notificationService.addNotification(
+        professor.getEmail(),
+        "Course Request Rejected",
+        String.format("Your course request has been rejected: %s. Reason: %s", 
+            courseNames, rejectionReason),
+        "PROFESSOR_COURSES_REJECTED"
+    );
+    
+    return new MessageResponse("Professor courses rejected successfully");
+}
 
     private User findUserByEmail(String email) {
         return userRepository.findByEmail(email)

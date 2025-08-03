@@ -1,10 +1,12 @@
 package com.auca.library.service;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.IncorrectResultSizeDataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,7 +26,6 @@ import com.auca.library.repository.EquipmentRequestRepository;
 import com.auca.library.repository.LabClassRepository;
 import com.auca.library.repository.RoomBookingRepository;
 import com.auca.library.repository.UserRepository;
-import java.time.Duration;
 
 @Service
 public class EquipmentRequestService {
@@ -75,6 +76,13 @@ public class EquipmentRequestService {
         // Check equipment availability
         if (!equipment.isAvailableInQuantity(request.getRequestedQuantity())) {
             throw new IllegalArgumentException("Requested quantity not available");
+        }
+
+        if (request.getRequestedQuantity() <= 0) {
+            throw new IllegalArgumentException("Requested quantity must be positive");
+        }
+        if (request.getReason() == null || request.getReason().trim().isEmpty()) {
+            throw new IllegalArgumentException("Reason is required");
         }
         
         // Check for time conflicts
@@ -127,11 +135,8 @@ public class EquipmentRequestService {
         EquipmentRequest equipmentRequest = findRequestById(requestId);
         User admin = findUserByEmail(adminEmail);
         
-        if (equipmentRequest.getStatus() != EquipmentRequest.RequestStatus.PENDING || 
-            equipmentRequest.getStatus() != EquipmentRequest.RequestStatus.APPROVED || 
-            equipmentRequest.getStatus() != EquipmentRequest.RequestStatus.REJECTED   
-        )  {
-            throw new IllegalStateException("this request can't be approved");
+       if (equipmentRequest.getStatus() != EquipmentRequest.RequestStatus.PENDING) {
+            throw new IllegalStateException("Only pending requests can be processed");
         }
         
         equipmentRequest.setApprovedBy(admin);
@@ -335,9 +340,9 @@ public class EquipmentRequestService {
                 .anyMatch(role -> role.getName().name().equals(roleName));
     }
 
-    private User findUserByEmail(String email) {
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
+     private User findUserByEmail(String email) {
+    return userRepository.findByEmail(email)
+        .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
     }
 
     private Equipment findEquipmentById(Long id) {
@@ -360,17 +365,32 @@ public class EquipmentRequestService {
                 .orElseThrow(() -> new ResourceNotFoundException("Equipment request not found: " + id));
     }
 
-    private String getEquipmentAdminEmail() {
-    return userRepository.findEquipmentAdmin()
-            .map(User::getEmail)
-            .orElse(null); 
-   }
+   
+// Temporary fix - modify your service methods to handle multiple results
+
+private String getEquipmentAdminEmail() {
+    try {
+        return userRepository.findEquipmentAdmin()
+                .map(User::getEmail)
+                .orElse(null);
+    } catch (IncorrectResultSizeDataAccessException e) {
+        // Fallback: get first equipment admin
+        List<User> admins = userRepository.findAllEquipmentAdmins();
+        return admins.isEmpty() ? null : admins.get(0).getEmail();
+    }
+}
 
     private String getHodEmail() {
+    try {
         return userRepository.findHod()
                 .map(User::getEmail)
-                .orElse(null); 
+                .orElse(null);
+    } catch (IncorrectResultSizeDataAccessException e) {
+        // Fallback: get first HOD
+        List<User> hods = userRepository.findAllHods();
+        return hods.isEmpty() ? null : hods.get(0).getEmail();
     }
+}
 
 
     // Get all equipment requests for the current month (Equipment Admin)
@@ -382,6 +402,48 @@ public class EquipmentRequestService {
             .map(this::mapToResponse)
             .collect(Collectors.toList());
     }
+
+
+
+    
+    // Get all equipment requests for the current month (Equipment Admin)
+    public List<EquipmentRequestResponse> getHodCurrentMonthRequests() {
+    LocalDateTime startOfMonth = LocalDateTime.now().withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0).withNano(0);
+    LocalDateTime endOfMonth = startOfMonth.plusMonths(1).minusNanos(1);
+    
+    return equipmentRequestRepository.findHodRequestsInDateRange(startOfMonth, endOfMonth).stream()
+            .map(this::mapToResponse)
+            .collect(Collectors.toList());
+    }
+
+    // Cancel request
+@Transactional
+public MessageResponse cancelRequest(Long requestId, String userEmail) {
+    EquipmentRequest request = findRequestById(requestId);
+    User user = findUserByEmail(userEmail);
+    
+    if (!request.getUser().equals(user)) {
+        throw new IllegalArgumentException("You can only cancel your own requests");
+    }
+    
+    if (request.getStatus() != EquipmentRequest.RequestStatus.PENDING) {
+        throw new IllegalStateException("Only pending requests can be cancelled");
+    }
+    
+    request.setStatus(EquipmentRequest.RequestStatus.CANCELLED);
+    equipmentRequestRepository.save(request);
+    
+    // Release reserved equipment
+    equipmentService.releaseEquipment(request.getEquipment().getId(), request.getRequestedQuantity());
+    
+    return new MessageResponse("Request cancelled successfully");
+}
+
+// Get request by ID
+public EquipmentRequestResponse getRequestById(Long requestId) {
+    EquipmentRequest request = findRequestById(requestId);
+    return mapToResponse(request);
+}
 
     private EquipmentRequestResponse mapToResponse(EquipmentRequest request) {
         EquipmentRequestResponse response = new EquipmentRequestResponse();
