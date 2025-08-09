@@ -1,4 +1,3 @@
-// File: src/main/java/com/auca/library/service/AdminUserService.java
 package com.auca.library.service;
 
 import java.security.SecureRandom;
@@ -23,14 +22,17 @@ import com.auca.library.dto.request.StaffCreationRequest;
 import com.auca.library.dto.request.StaffUpdateRequest;
 import com.auca.library.dto.request.StudentUpdateRequest;
 import com.auca.library.dto.response.BulkActionResponse;
+import com.auca.library.dto.response.CourseResponse;
 import com.auca.library.dto.response.MessageResponse;
 import com.auca.library.dto.response.StaffPasswordStatusResponse;
 import com.auca.library.dto.response.UserResponse;
 import com.auca.library.exception.EmailAlreadyExistsException;
 import com.auca.library.exception.ResourceNotFoundException;
+import com.auca.library.model.Course;
 import com.auca.library.model.Location;
 import com.auca.library.model.Role;
 import com.auca.library.model.User;
+import com.auca.library.repository.CourseRepository;
 import com.auca.library.repository.RoleRepository;
 import com.auca.library.repository.UserRepository;
 
@@ -45,6 +47,9 @@ public class AdminUserService {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private CourseRepository courseRepository;
 
     private static final String DEFAULT_PASSWORD_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%";
     private static final int DEFAULT_PASSWORD_LENGTH = 12;
@@ -163,6 +168,10 @@ public class AdminUserService {
             handleLibrarianCreation(user, request);
         }
 
+        if (roleEnum == Role.ERole.ROLE_PROFESSOR) {
+           handleProfessorCreation(user, request);
+        }
+
         User savedUser = userRepository.save(user);
         
         // Log the default password (in real implementation, you might want to send via email)
@@ -170,6 +179,18 @@ public class AdminUserService {
         
         return mapToResponse(savedUser);
     }
+
+    private void handleProfessorCreation(User user, StaffCreationRequest request) {
+    if (request.getCourseIds() != null && !request.getCourseIds().isEmpty()) {
+        Set<Course> courses = request.getCourseIds().stream()
+            .map(courseId -> courseRepository.findById(courseId)
+                .orElseThrow(() -> new RuntimeException("Course not found: " + courseId)))
+            .collect(Collectors.toSet());
+        
+        // Directly assign to approved courses
+        user.setApprovedCourses(courses);
+    }
+}
 
     @Transactional
     public UserResponse createMultipleRoleUser(StaffCreationRequest request, List<String> roleNames) throws EmailAlreadyExistsException {
@@ -243,8 +264,56 @@ public class AdminUserService {
             handleLibrarianUpdate(user, request);
         }
 
+        // Handle professor course updates
+        if (user.isProfessor()) {
+            handleProfessorCourseUpdate(user, request);
+        }
+
         return mapToResponse(userRepository.save(user));
     }
+
+    private void handleProfessorCourseUpdate(User user, StaffUpdateRequest request) {
+    if (request.getCourseIds() != null) {
+        // Clear existing courses
+        user.getApprovedCourses().clear();
+        
+        // Add new courses
+        if (!request.getCourseIds().isEmpty()) {
+            Set<Course> newCourses = request.getCourseIds().stream()
+                .map(courseId -> courseRepository.findById(courseId)
+                    .orElseThrow(() -> new RuntimeException("Course not found: " + courseId)))
+                .collect(Collectors.toSet());
+            
+            user.setApprovedCourses(newCourses);
+        }
+    }
+    // If courseIds is null, don't modify existing courses (no changes requested)
+}
+
+@Transactional
+public UserResponse updateStaffUserCourses(Long userId, List<Long> courseIds) {
+    User user = findUserById(userId);
+    
+    if (!user.isProfessor()) {
+        throw new IllegalStateException("Can only update courses for professors");
+    }
+
+    // Clear existing courses
+    user.getApprovedCourses().clear();
+    
+    // Add new courses if provided
+    if (courseIds != null && !courseIds.isEmpty()) {
+        Set<Course> newCourses = courseIds.stream()
+            .map(courseId -> courseRepository.findById(courseId)
+                .orElseThrow(() -> new RuntimeException("Course not found: " + courseId)))
+            .collect(Collectors.toSet());
+        
+        user.setApprovedCourses(newCourses);
+    }
+    
+    User savedUser = userRepository.save(user);
+    return mapToResponse(savedUser);
+}
 
     @Transactional
     public UserResponse updateStudentUser(Long id, StudentUpdateRequest request) {
@@ -471,6 +540,7 @@ private void handleLibrarianUpdate(User user, StaffUpdateRequest request) {
 
     private UserResponse mapToResponse(User user) {
         UserResponse response = new UserResponse();
+        response.setIdentifier(user.getIdentifier());
         response.setId(user.getId());
         response.setFullName(user.getFullName());
         response.setEmail(user.getEmail());
@@ -496,6 +566,18 @@ private void handleLibrarianUpdate(User user, StaffUpdateRequest request) {
             response.setActiveToday(user.isActiveLibrarianToday());
             response.setLocation(user.getLocation());
         }
+
+        response.setAssignedCourses(user.getApprovedCourses().stream()
+            .map(course -> {
+                CourseResponse courseResponse = new CourseResponse();
+                courseResponse.setId(course.getId());
+                courseResponse.setCourseCode(course.getCourseCode());
+                courseResponse.setCourseName(course.getCourseName());
+                courseResponse.setCreditHours(course.getCreditHours());
+                courseResponse.setActive(course.isActive());
+                return courseResponse;
+            })
+            .collect(Collectors.toList()));
         
         // Set professor-specific fields
         if (user.isProfessor()) {
@@ -546,13 +628,9 @@ private void handleLibrarianUpdate(User user, StaffUpdateRequest request) {
                 if (emailVerified != null && user.isEmailVerified() != emailVerified) {
                     return false;
                 }
+        // Filter by password change requirement
                 
-                // Filter by password change requirement
-                if (mustChangePassword != null && user.isMustChangePassword() != mustChangePassword) {
-                    return false;
-                }
-                
-                return true;
+                return !(mustChangePassword != null && user.isMustChangePassword() != mustChangePassword);
             })
             .map(this::mapToResponse)
             .collect(Collectors.toList());
@@ -591,16 +669,11 @@ public List<UserResponse> filterUsers(List<String> roles, List<String> locations
                             });
                     if (!matchesLocation) return false;
                 }
-                
-                // Filter by active status
-                if (active != null && user.isEmailVerified() != active) {
-                    return false;
-                }
-                
-                // Note: createdAfter and createdBefore would need a createdAt field in User entity
-                // For now, we'll skip these filters
-                
-                return true;
+        // Filter by active status
+        // Note: createdAfter and createdBefore would need a createdAt field in User entity
+        // For now, we'll skip these filters
+                       
+                return !(active != null && user.isEmailVerified() != active);
             })
             .map(this::mapToResponse)
             .collect(Collectors.toList());

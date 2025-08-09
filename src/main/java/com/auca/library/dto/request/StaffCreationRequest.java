@@ -1,7 +1,7 @@
 package com.auca.library.dto.request;
 
 import java.time.DayOfWeek;
-import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import com.auca.library.model.Location;
@@ -41,6 +41,8 @@ public class StaffCreationRequest {
     private Set<DayOfWeek> workingDays;
     private boolean activeThisWeek = false;
     private boolean defaultLibrarian = false;
+
+    private List<Long> courseIds;
      
        public boolean isDefaultLibrarian() {
         return defaultLibrarian;
