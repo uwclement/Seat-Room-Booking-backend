@@ -2,6 +2,7 @@ package com.auca.library.dto.response;
 
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -32,6 +33,7 @@ public class UserResponse {
     // Professor based fields
     private boolean professorApproved;
     private LocalDateTime professorApprovedAt;
+    private List<CourseResponse> assignedCourses = new ArrayList<>();
 
 
     // Password management fields

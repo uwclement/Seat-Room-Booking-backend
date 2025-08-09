@@ -50,8 +50,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = 'ROLE_PROFESSOR' AND u.professorApproved = true")
     List<User> findApprovedProfessors();
 
-//     @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = 'ROLE_EQUIPMENT_ADMIN'")
-//     Optional<User> findEquipmentAdmin();
 
      @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = 'ROLE_EQUIPMENT_ADMIN'")
      List<User> findAllEquipmentAdmins();
@@ -61,6 +59,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     default Optional<User> findEquipmentAdmin() {
         List<User> admins = findAllEquipmentAdmins();
+        return admins.isEmpty() ? Optional.empty() : Optional.of(admins.get(0));
+    }
+
+        default Optional<User> findAdmin() {
+        List<User> admins = findAllAdmins();
         return admins.isEmpty() ? Optional.empty() : Optional.of(admins.get(0));
     }
     
@@ -137,9 +140,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u.email, COUNT(u) FROM User u GROUP BY u.email HAVING COUNT(u) > 1")
     List<Object[]> findDuplicateEmails();
 
-    @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = 'ROLE_PROFESSOR' " +
-       "AND u.professorApproved = true AND SIZE(u.pendingCourses) > 0")
-     List<User> findProfessorsWithPendingCourses();
+//     @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = 'ROLE_PROFESSOR' " +
+//        "AND u.professorApproved = true AND SIZE(u.pendingCourses) > 0")
+//      List<User> findProfessorsWithPendingCourses();
 
 
      @Query("SELECT u FROM User u JOIN u.roles r JOIN u.workingDays wd " +

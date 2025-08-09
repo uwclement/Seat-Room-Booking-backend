@@ -122,7 +122,7 @@ public class EquipmentService {
         return false;
     }
 
-    // NEW: Release equipment quantity
+    // Release equipment quantity
     @Transactional
     public void releaseEquipment(Long equipmentId, int quantity) {
         Equipment equipment = findEquipmentById(equipmentId);

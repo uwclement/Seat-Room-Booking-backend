@@ -1,12 +1,15 @@
 package com.auca.library.model;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -27,9 +30,6 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import java.time.DayOfWeek;
-import jakarta.persistence.ElementCollection;
-import jakarta.persistence.CollectionTable;
 
 @Entity
 @Table(name = "users", 
@@ -125,13 +125,12 @@ public class User {
     @JoinColumn(name = "approved_by_hod")
     private User approvedByHod;
 
-    @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-    name = "user_pending_courses",
-    joinColumns = @JoinColumn(name = "user_id"),
-    inverseJoinColumns = @JoinColumn(name = "course_id")
-    )
-    private Set<Course> pendingCourses = new HashSet<>();
+    private String rejectionReason;
+    private LocalDateTime rejectedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "rejected_by_hod")
+    private User rejectedByHod;
 
     // Constructors
     public User(String fullName, String email, String password, Location location) {
@@ -154,6 +153,7 @@ public class User {
         this.phone = phone;
         this.mustChangePassword = true; // Staff must change default password
         this.emailVerified = true; // Staff accounts are pre-verified
+        
     }
 
     // Utility methods

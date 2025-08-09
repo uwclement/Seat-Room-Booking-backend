@@ -1,9 +1,11 @@
 package com.auca.library.dto.response;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
 import lombok.Getter;
 import lombok.Setter;
-import java.time.LocalDateTime;
-import java.util.List;
 
 @Getter
 @Setter
@@ -23,6 +25,8 @@ public class ProfessorResponse {
     private List<String> courseNames;
     private List<String> courseCodes;
     private int approvedCourseCount;
+    private List<CourseResponse> assignedCourses = new ArrayList<>();
+    private String employeeId;
     
     // Statistics
     private int totalEquipmentRequests;
@@ -33,6 +37,7 @@ public class ProfessorResponse {
     // Recent activity
     private LocalDateTime lastRequestDate;
     private boolean hasRecentActivity; // Activity in last 30 days
+    
 
     private List<Long> pendingCourseIds;
     private List<String> pendingCourseNames;
@@ -42,5 +47,19 @@ public class ProfessorResponse {
 
     public List<String> getPendingCourseNames() { return pendingCourseNames; } 
     public void setPendingCourseNames(List<String> pendingCourseNames) { this.pendingCourseNames = pendingCourseNames; }
-    
+    public List<CourseResponse> getAssignedCourses() {
+    return assignedCourses;
+}
+
+public void setAssignedCourses(List<CourseResponse> assignedCourses) {
+    this.assignedCourses = assignedCourses;
+}
+
+public String getEmployeeId() {
+    return employeeId;
+}
+
+public void setEmployeeId(String employeeId) {
+    this.employeeId = employeeId;
+}
 }

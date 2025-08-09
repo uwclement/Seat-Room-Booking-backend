@@ -32,7 +32,6 @@ public class NotificationController {
      * Retrieve all notifications for the current user
      */
     @GetMapping
-    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<List<NotificationMessage>> getCurrentUserNotifications() {
         List<NotificationMessage> notifications = notificationService.getCurrentUserNotifications();
         return ResponseEntity.ok(notifications);
@@ -44,7 +43,6 @@ public class NotificationController {
      * CHANGE: id is now Long instead of String
      */
     @PostMapping("/{id}/read")
-    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<MessageResponse> markAsRead(@PathVariable Long id) {
         notificationService.markAsRead(id);
         return ResponseEntity.ok(new MessageResponse("Notification marked as read"));
@@ -55,7 +53,6 @@ public class NotificationController {
      * Mark all notifications as read for the current user
      */
     @PostMapping("/mark-all-read")
-    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<MessageResponse> markAllAsRead() {
         notificationService.markAllAsRead();
         return ResponseEntity.ok(new MessageResponse("All notifications marked as read"));

@@ -160,6 +160,19 @@ public class AdminUserController {
         }
     }
 
+@PutMapping("/staff/{id}/courses")
+public ResponseEntity<?> updateStaffUserCourses(
+        @PathVariable Long id, 
+        @RequestBody Map<String, List<Long>> request) { 
+    try {
+        List<Long> courseIds = request.get("courseIds"); 
+        UserResponse response = adminUserService.updateStaffUserCourses(id, courseIds);
+        return ResponseEntity.ok(ApiResponse.success("Staff user courses updated successfully", response));
+    } catch (Exception e) {
+        return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+    }
+}
+
     @PutMapping("/students/{id}")
     public ResponseEntity<?> updateStudentUser(
             @PathVariable Long id, 
