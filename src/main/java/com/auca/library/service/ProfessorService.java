@@ -2,7 +2,6 @@ package com.auca.library.service;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,7 +15,6 @@ import com.auca.library.dto.response.ProfessorResponse;
 import com.auca.library.exception.ResourceNotFoundException;
 import com.auca.library.model.Course;
 import com.auca.library.model.User;
-import com.auca.library.repository.CourseRepository;
 import com.auca.library.repository.UserRepository;
 import com.auca.library.util.NotificationConstants;
 
@@ -25,9 +23,6 @@ public class ProfessorService {
 
     @Autowired
     private UserRepository userRepository;
-    
-    @Autowired
-    private CourseRepository courseRepository;
     
     @Autowired
     private NotificationService notificationService;
@@ -86,7 +81,6 @@ public class ProfessorService {
 public MessageResponse rejectProfessorAccount(Long professorId, String rejectionReason, String hodEmail) {
     User professor = findUserById(professorId);
     User hod = findUserByEmail(hodEmail);
-    Optional<User> admin = userRepository.findEquipmentAdmin();
     
     // Keep professor unapproved
     professor.setProfessorApproved(false);

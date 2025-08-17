@@ -88,7 +88,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findActiveLibrariansForDay(@Param("dayOfWeek") DayOfWeek dayOfWeek);
 
     // Fixed: Use isDefaultLibrarian instead of defaultLibrarian
-    @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = 'ROLE_LIBRARIAN' AND u.isDefaultLibrarian = true")
+    @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = 'ROLE_LIBRARIAN' AND u.DefaultLibrarian = true")
     Optional<User> findDefaultLibrarian();
 
     // Fixed: Count active librarians for a day
@@ -111,14 +111,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findLibrariansByDayAndLocation(@Param("dayOfWeek") DayOfWeek dayOfWeek, 
                                               @Param("location") Location location);
 
-//     @Query("SELECT u FROM User u JOIN u.roles r JOIN u.workingDays wd " +
-//            "WHERE r.name = 'ROLE_LIBRARIAN' AND wd = :dayOfWeek AND u.location = :location " +
-//            "AND u.activeThisWeek = true")
-//     List<User> findActiveLibrariansForDay(@Param("dayOfWeek") DayOfWeek dayOfWeek, 
-//                                           @Param("location") Location location);
     
     @Query("SELECT u FROM User u JOIN u.roles r " +
-           "WHERE r.name = 'ROLE_LIBRARIAN' AND u.location = :location AND u.isDefaultLibrarian = true")
+           "WHERE r.name = 'ROLE_LIBRARIAN' AND u.location = :location AND u.DefaultLibrarian = true")
     Optional<User> findDefaultLibrarianByLocation(@Param("location") Location location);
     
     @Query("SELECT COUNT(u) FROM User u JOIN u.roles r JOIN u.workingDays wd " +
@@ -128,7 +123,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
                                               @Param("location") Location location);
     
     @Query("SELECT u FROM User u JOIN u.roles r " +
-           "WHERE r.name = 'ROLE_LIBRARIAN' AND u.location = :location AND u.isDefaultLibrarian = true")
+           "WHERE r.name = 'ROLE_LIBRARIAN' AND u.location = :location AND u.DefaultLibrarian = true")
     List<User> findDefaultLibrariansByLocation(@Param("location") Location location);
 
     // Staff with default passwords
@@ -150,4 +145,76 @@ public interface UserRepository extends JpaRepository<User, Long> {
        "AND u.activeThisWeek = true")
      List<User> findActiveLibrariansForDay(@Param("dayOfWeek") DayOfWeek dayOfWeek, 
                                       @Param("location") Location location);
+
+
+     @Query("SELECT COUNT(u) FROM User u WHERE u.location = :location")
+    int countByLocation(@Param("location") Location location);
+    
+    @Query("SELECT COUNT(u) FROM User u WHERE u.location = :location AND " +
+           "u.createdAt >= :startDate AND u.createdAt <= :endDate")
+    int countByLocationAndCreatedAtBetween(@Param("location") Location location,
+                                          @Param("startDate") LocalDateTime startDate,
+                                          @Param("endDate") LocalDateTime endDate);
+    
+    @Query("SELECT COUNT(u) FROM User u WHERE u.createdAt >= :startDate AND u.createdAt <= :endDate")
+    int countByCreatedAtBetween(@Param("startDate") LocalDateTime startDate,
+                               @Param("endDate") LocalDateTime endDate);
+    
+    @Query("SELECT COUNT(u) FROM User u WHERE u.location = :location AND u.createdAt <= :cutoffDate")
+    int countByLocationAndCreatedAtBefore(@Param("location") Location location,
+                                         @Param("cutoffDate") LocalDateTime cutoffDate);
+    
+    @Query("SELECT COUNT(u) FROM User u WHERE u.createdAt <= :cutoffDate")
+    int countByCreatedAtBefore(@Param("cutoffDate") LocalDateTime cutoffDate);
+    
+    // User type counts by location
+    @Query("SELECT COUNT(u) FROM User u JOIN u.roles r WHERE u.location = :location AND " +
+           "r.name = 'ROLE_USER' ")
+    int countStudentsByLocation(@Param("location") Location location);
+    
+    @Query("SELECT COUNT(u) FROM User u JOIN u.roles r WHERE u.location = :location AND " +
+           "r.name = 'ROLE_PROFESSOR'")
+    int countProfessorsByLocation(@Param("location") Location location);
+    
+    @Query("SELECT COUNT(u) FROM User u JOIN u.roles r WHERE u.location = :location AND " +
+           "r.name = 'ROLE_LIBRARIAN'")
+    int countLibrariansByLocation(@Param("location") Location location);
+    
+    @Query("SELECT COUNT(u) FROM User u JOIN u.roles r WHERE u.location = :location AND " +
+           "r.name = 'ROLE_ADMIN'")
+    int countAdminsByLocation(@Param("location") Location location);
+    
+    @Query("SELECT COUNT(u) FROM User u JOIN u.roles r WHERE u.location = :location AND " +
+           "r.name = 'ROLE_EQUIPMENT_ADMIN'")
+    int countEquipmentAdminsByLocation(@Param("location") Location location);
+    
+    @Query("SELECT COUNT(DISTINCT u) FROM User u JOIN u.roles r WHERE u.location = :location AND r.name != 'ROLE_USER'")
+    int countStaffByLocation(@Param("location") Location location);
+    
+    // Global user type counts
+    @Query("SELECT COUNT(u) FROM User u JOIN u.roles r WHERE r.name = 'ROLE_USER' ")
+    int countAllStudents();
+    
+    @Query("SELECT COUNT(u) FROM User u JOIN u.roles r WHERE r.name = 'ROLE_PROFESSOR'")
+    int countAllProfessors();
+    
+    @Query("SELECT COUNT(u) FROM User u JOIN u.roles r WHERE r.name = 'ROLE_LIBRARIAN'")
+    int countAllLibrarians();
+    
+    @Query("SELECT COUNT(u) FROM User u JOIN u.roles r WHERE r.name = 'ROLE_ADMIN'")
+    int countAllAdmins();
+    
+    @Query("SELECT COUNT(u) FROM User u JOIN u.roles r WHERE r.name = 'ROLE_EQUIPMENT_ADMIN'")
+    int countAllEquipmentAdmins();
+    
+   @Query("SELECT COUNT(DISTINCT u) FROM User u JOIN u.roles r WHERE r.name IN ('ROLE_ADMIN', 'ROLE_STAFF', 'ROLE_LIBRARIAN')")
+   int countAllStaff();
+    
+    // User lists by location
+   @Query("SELECT u FROM User u JOIN u.roles r WHERE u.location = :location AND r.name != 'ROLE_USER'")
+   List<User> findStaffByLocation(@Param("location") Location location);
+    
+    @Query("SELECT u FROM User u JOIN u.roles r WHERE u.location = :location AND r.name = 'ROLE_PROFESSOR'")
+    List<User> findProfessorsByLocation(@Param("location") Location location);
+                                     
 }

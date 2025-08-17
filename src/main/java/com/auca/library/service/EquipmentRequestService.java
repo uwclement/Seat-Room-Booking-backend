@@ -283,9 +283,14 @@ public class EquipmentRequestService {
     // Get requests for current user
     public List<EquipmentRequestResponse> getCurrentUserRequests(String userEmail) {
         User user = findUserByEmail(userEmail);
-        return equipmentRequestRepository.findByUserOrderByCreatedAtDesc(user).stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+            List<EquipmentRequest> requests = equipmentRequestRepository.findByUserOrderByCreatedAtDesc(user);
+    
+            // Update statuses on-demand
+            requests.forEach(this::updateRequestStatusIfNeeded);
+    
+     return requests.stream()
+            .map(this::mapToResponse)
+            .collect(Collectors.toList());
     }
 
     // Get pending requests (Equipment Admin)
@@ -447,6 +452,7 @@ public EquipmentRequestResponse getRequestById(Long requestId) {
 
     private EquipmentRequestResponse mapToResponse(EquipmentRequest request) {
         EquipmentRequestResponse response = new EquipmentRequestResponse();
+
         response.setId(request.getId());
         response.setEquipmentId(request.getEquipment().getId());
         response.setEquipmentName(request.getEquipment().getName());
@@ -485,7 +491,380 @@ public EquipmentRequestResponse getRequestById(Long requestId) {
         if (request.getApprovedBy() != null) {
             response.setApprovedByName(request.getApprovedBy().getFullName());
         }
+
+        // Suggestion response fields
+    response.setSuggestionAcknowledged(request.getSuggestionAcknowledged());
+    response.setSuggestionResponseReason(request.getSuggestionResponseReason());
+    response.setSuggestionResponseAt(request.getSuggestionResponseAt());
+    response.setCanRespondToSuggestion(
+        request.getAdminSuggestion() != null && 
+        request.getSuggestionAcknowledged() == null && 
+        request.getStatus() != EquipmentRequest.RequestStatus.HOD_REJECTED
+    );
+    
+    // Return fields
+    response.setReturnedAt(request.getReturnedAt());
+    if (request.getReturnedBy() != null) {
+        response.setReturnedByName(request.getReturnedBy().getFullName());
+    }
+    response.setReturnCondition(request.getReturnCondition());
+    response.setReturnNotes(request.getReturnNotes());
+    response.setEarlyReturn(request.getIsEarlyReturn() != null ? request.getIsEarlyReturn() : false);
+    response.setLateReturn(request.getIsLateReturn() != null ? request.getIsLateReturn() : false);
+    response.setCanMarkReturned(
+        request.getReturnedAt() == null && 
+        (request.getStatus() == EquipmentRequest.RequestStatus.APPROVED ||
+         request.getStatus() == EquipmentRequest.RequestStatus.IN_USE ||
+         request.getStatus() == EquipmentRequest.RequestStatus.HOD_APPROVED)
+    );
+    
+    // Extension fields
+    response.setTotalExtensionsToday(request.getTotalExtensionsToday() != null ? request.getTotalExtensionsToday().doubleValue() : 0.0);
+    response.setTotalExtensionHoursToday(request.getTotalExtensionHoursToday() != null ? request.getTotalExtensionHoursToday() : 0.0);
+    response.setRemainingExtensionHours(3.0 - (request.getTotalExtensionHoursToday() != null ? request.getTotalExtensionHoursToday() : 0.0));
+    response.setExtensionReason(request.getExtensionReason());
+    response.setExtensionStatus(request.getExtensionStatus());
+    response.setExtensionRequestedAt(request.getExtensionRequestedAt());
+    response.setExtensionApprovedAt(request.getExtensionApprovedAt());
+    response.setExtensionHoursRequested(request.getExtensionHoursRequested());
+    if (request.getExtensionApprovedBy() != null) {
+        response.setExtensionApprovedByName(request.getExtensionApprovedBy().getFullName());
+    }
+    response.setOriginalEndTime(request.getOriginalEndTime());
+    response.setHasActiveExtension(request.getExtensionStatus() != null && !request.getExtensionStatus().equals("REJECTED"));
+    
+    // Action availability flags
+    LocalDateTime now = LocalDateTime.now();
+    response.setCanRequestExtension(
+        request.getExtensionStatus() == null || request.getExtensionStatus().equals("REJECTED") &&
+        (request.getStatus() == EquipmentRequest.RequestStatus.APPROVED ||
+         request.getStatus() == EquipmentRequest.RequestStatus.IN_USE) &&
+        response.getRemainingExtensionHours() > 0
+    );
+    
+    response.setCanApproveExtension(request.getExtensionStatus() != null && request.getExtensionStatus().equals("PENDING"));
+    
+    response.setCanCancel(request.getStatus() == EquipmentRequest.RequestStatus.PENDING);
+    
+    response.setCanEscalateToHod(
+        request.getStatus() == EquipmentRequest.RequestStatus.REJECTED && 
+        !request.isEscalatedToHod()
+    );
+    
+    // Check for conflicts if extension is pending
+    if (request.getExtensionStatus() != null && request.getExtensionStatus().equals("PENDING")) {
+        LocalDateTime newEndTime = request.getEndTime()
+            .plusHours(request.getExtensionHoursRequested().longValue())
+            .plusMinutes((long)((request.getExtensionHoursRequested() % 1) * 60));
+        
+        List<EquipmentRequest> conflicts = equipmentRequestRepository.findConflictingRequests(
+            request.getEquipment().getId(), request.getEndTime(), newEndTime);
+        
+        response.setHasConflicts(!conflicts.isEmpty());
+        response.setConflictingRequestsCount(conflicts.size());
+        if (!conflicts.isEmpty()) {
+            response.setConflictDetails(String.format("%d conflicting booking(s) in extended time slot", conflicts.size()));
+        }
+    }
+
+     if (hasRole(request.getUser(), "ROLE_PROFESSOR")) {
+        double usedToday = getTotalExtensionHoursToday(request.getUser().getId());
+        response.setTotalExtensionHoursToday(usedToday);
+        response.setRemainingExtensionHours(3.0 - usedToday);
+    }
+    
+    // UI section visibility flags
+    response.setShowReturnSection(response.isCanMarkReturned());
+    response.setShowExtensionSection(response.isCanRequestExtension() || response.isCanApproveExtension());
         
         return response;
     }
+
+
+
+// ===== SUGGESTION RESPONSE METHODS =====
+
+@Transactional
+public MessageResponse respondToSuggestion(Long requestId, EquipmentRequestRequest request, String professorEmail) {
+    EquipmentRequest equipmentRequest = findRequestById(requestId);
+    User professor = findUserByEmail(professorEmail);
+    
+    // Validate professor can respond
+    if (!equipmentRequest.getUser().equals(professor)) {
+        throw new IllegalArgumentException("You can only respond to suggestions on your own requests");
+    }
+    
+    // Check if request has admin suggestion and valid status
+    if (equipmentRequest.getAdminSuggestion() == null || equipmentRequest.getAdminSuggestion().trim().isEmpty()) {
+        throw new IllegalArgumentException("No admin suggestion found to respond to");
+    }
+    
+    if (equipmentRequest.getStatus() == EquipmentRequest.RequestStatus.HOD_REJECTED) {
+        throw new IllegalStateException("Cannot respond to suggestions on HOD rejected requests");
+    }
+    
+    // Set response
+    equipmentRequest.setSuggestionAcknowledged(request.getSuggestionAcknowledged());
+    equipmentRequest.setSuggestionResponseReason(request.getSuggestionResponseReason());
+    equipmentRequest.setSuggestionResponseAt(LocalDateTime.now());
+    
+    equipmentRequestRepository.save(equipmentRequest);
+    
+    // Notify equipment admin
+    String responseType = request.getSuggestionAcknowledged() ? "acknowledged" : "rejected";
+    String notificationMessage = String.format("Professor %s has %s your suggestion for %s request", 
+        professor.getFullName(), responseType, equipmentRequest.getEquipment().getName());
+    
+    if (!request.getSuggestionAcknowledged() && request.getSuggestionResponseReason() != null) {
+        notificationMessage += ". Reason: " + request.getSuggestionResponseReason();
+    }
+    
+    notificationService.addNotification(
+        getEquipmentAdminEmail(),
+        "Suggestion Response Received",
+        notificationMessage,
+        "SUGGESTION_RESPONSE"
+    );
+    
+    return new MessageResponse("Response to suggestion submitted successfully");
+}
+
+// ===== EXTENSION REQUEST METHODS =====
+
+@Transactional
+public MessageResponse requestExtension(Long requestId, EquipmentRequestRequest request, String professorEmail) {
+    EquipmentRequest equipmentRequest = findRequestById(requestId);
+    User professor = findUserByEmail(professorEmail);
+    
+    // Validate professor can request extension
+    if (!equipmentRequest.getUser().equals(professor)) {
+        throw new IllegalArgumentException("You can only request extensions for your own requests");
+    }
+    
+    // Check request status
+    if (equipmentRequest.getStatus() != EquipmentRequest.RequestStatus.APPROVED && 
+        equipmentRequest.getStatus() != EquipmentRequest.RequestStatus.IN_USE) {
+        throw new IllegalStateException("Extensions can only be requested for approved or in-use requests");
+    }
+    
+    // Check if already has pending extension
+    if (equipmentRequest.getExtensionStatus() != null && 
+        equipmentRequest.getExtensionStatus().equals("PENDING")) {
+        throw new IllegalStateException("Extension request already pending");
+    }
+    
+    // Validate daily extension limit
+    double todayExtensions = getTotalExtensionHoursToday(professor.getId());
+    if (todayExtensions + request.getExtensionHoursRequested() > 3.0) {
+        throw new IllegalArgumentException(
+            String.format("Daily extension limit exceeded. You have used %.1f hours today, requesting %.1f more exceeds the 3-hour limit", 
+                todayExtensions, request.getExtensionHoursRequested()));
+    }
+    
+    // Store original end time if first extension
+    if (equipmentRequest.getOriginalEndTime() == null) {
+        equipmentRequest.setOriginalEndTime(equipmentRequest.getEndTime());
+    }
+    
+    // Set extension request details
+    equipmentRequest.setExtensionReason(request.getExtensionReason());
+    equipmentRequest.setExtensionStatus("PENDING");
+    equipmentRequest.setExtensionRequestedAt(LocalDateTime.now());
+    equipmentRequest.setExtensionHoursRequested(request.getExtensionHoursRequested());
+    
+    equipmentRequestRepository.save(equipmentRequest);
+    
+    // Check for conflicts in extended time slot
+    LocalDateTime newEndTime = equipmentRequest.getEndTime().plusHours(request.getExtensionHoursRequested().longValue())
+        .plusMinutes((long)((request.getExtensionHoursRequested() % 1) * 60));
+    
+    List<EquipmentRequest> conflicts = equipmentRequestRepository.findConflictingRequests(
+        equipmentRequest.getEquipment().getId(), equipmentRequest.getEndTime(), newEndTime);
+    
+    // Notify equipment admin with conflict info
+    String conflictInfo = conflicts.isEmpty() ? "No conflicts detected." : 
+        String.format("%d conflicting booking(s) detected in extended time slot.", conflicts.size());
+    
+    notificationService.addNotification(
+        getEquipmentAdminEmail(),
+        "Extension Request Received",
+        String.format("Professor %s requests %.1f hour extension for %s. %s", 
+            professor.getFullName(), request.getExtensionHoursRequested(), 
+            equipmentRequest.getEquipment().getName(), conflictInfo),
+        "EXTENSION_REQUEST"
+    );
+    
+    return new MessageResponse("Extension request submitted successfully");
+}
+
+@Transactional
+public MessageResponse handleExtensionRequest(Long requestId, EquipmentRequestRequest request, String adminEmail) {
+    EquipmentRequest equipmentRequest = findRequestById(requestId);
+    User admin = findUserByEmail(adminEmail);
+    
+    if (!equipmentRequest.getExtensionStatus().equals("PENDING")) {
+        throw new IllegalStateException("No pending extension request found");
+    }
+    
+    equipmentRequest.setExtensionApprovedBy(admin);
+    equipmentRequest.setExtensionApprovedAt(LocalDateTime.now());
+    
+    if (request.getApproved()) {
+        equipmentRequest.setExtensionStatus("APPROVED");
+        
+        // Update end time
+        LocalDateTime newEndTime = equipmentRequest.getEndTime()
+            .plusHours(equipmentRequest.getExtensionHoursRequested().longValue())
+            .plusMinutes((long)((equipmentRequest.getExtensionHoursRequested() % 1) * 60));
+        equipmentRequest.setEndTime(newEndTime);
+        
+        // Update daily totals
+        equipmentRequest.setTotalExtensionsToday(equipmentRequest.getTotalExtensionsToday() + 1);
+        equipmentRequest.setTotalExtensionHoursToday(
+            equipmentRequest.getTotalExtensionHoursToday() + equipmentRequest.getExtensionHoursRequested());
+        
+        notificationService.addNotification(
+            equipmentRequest.getUser().getEmail(),
+            "Extension Request Approved",
+            String.format("Your %.1f hour extension for %s has been approved", 
+                equipmentRequest.getExtensionHoursRequested(), equipmentRequest.getEquipment().getName()),
+            "EXTENSION_APPROVED"
+        );
+        
+        // Notify HOD if this was an escalated request
+        if (equipmentRequest.isEscalatedToHod()) {
+            notificationService.addNotification(
+                getHodEmail(),
+                "Extension Approved for Escalated Request",
+                String.format("Extension approved for escalated request: %s", 
+                    equipmentRequest.getEquipment().getName()),
+                "EXTENSION_HOD_INFO"
+            );
+        }
+        
+    } else {
+        equipmentRequest.setExtensionStatus("REJECTED");
+        equipmentRequest.setRejectionReason(request.getRejectionReason());
+        
+        notificationService.addNotification(
+            equipmentRequest.getUser().getEmail(),
+            "Extension Request Rejected",
+            String.format("Your extension request for %s has been rejected. Reason: %s", 
+                equipmentRequest.getEquipment().getName(), 
+                request.getRejectionReason() != null ? request.getRejectionReason() : "No reason provided"),
+            "EXTENSION_REJECTED"
+        );
+    }
+    
+    equipmentRequestRepository.save(equipmentRequest);
+    return new MessageResponse("Extension request processed successfully");
+}
+
+// ===== RETURN EQUIPMENT METHODS =====
+
+@Transactional
+public MessageResponse markEquipmentReturned(Long requestId, EquipmentRequestRequest request, String adminEmail) {
+    EquipmentRequest equipmentRequest = findRequestById(requestId);
+    User admin = findUserByEmail(adminEmail);
+    
+    // Validate request can be marked as returned
+    if (equipmentRequest.getStatus() != EquipmentRequest.RequestStatus.APPROVED && 
+        equipmentRequest.getStatus() != EquipmentRequest.RequestStatus.IN_USE &&
+        equipmentRequest.getStatus() != EquipmentRequest.RequestStatus.HOD_APPROVED) {
+        throw new IllegalStateException("Only approved or in-use requests can be marked as returned");
+    }
+    
+    if (equipmentRequest.getReturnedAt() != null) {
+        throw new IllegalStateException("Equipment already marked as returned");
+    }
+    
+    LocalDateTime returnTime = LocalDateTime.now();
+    LocalDateTime endTime = equipmentRequest.getEndTime();
+    
+    // Set return details
+    equipmentRequest.setReturnedAt(returnTime);
+    equipmentRequest.setReturnedBy(admin);
+    equipmentRequest.setReturnCondition(request.getReturnCondition());
+    equipmentRequest.setReturnNotes(request.getReturnNotes());
+    equipmentRequest.setIsEarlyReturn(returnTime.isBefore(endTime));
+    equipmentRequest.setIsEarlyReturn(returnTime.isAfter(endTime));
+    equipmentRequest.setStatus(EquipmentRequest.RequestStatus.RETURNED);
+    
+    equipmentRequestRepository.save(equipmentRequest);
+    
+    // Release equipment
+    equipmentService.releaseEquipment(
+        equipmentRequest.getEquipment().getId(), 
+        equipmentRequest.getRequestedQuantity()
+    );
+    
+    // Notify professor
+    String returnType = equipmentRequest.getIsEarlyReturn() ? "early" : 
+                       equipmentRequest.getIsLateReturn() ? "late" : "on time";
+    
+    notificationService.addNotification(
+        equipmentRequest.getUser().getEmail(),
+        "Equipment Returned",
+        String.format("Your equipment %s has been marked as returned (%s) - Condition: %s", 
+            equipmentRequest.getEquipment().getName(), returnType, request.getReturnCondition()),
+        "EQUIPMENT_RETURNED"
+    );
+    
+    return new MessageResponse("Equipment marked as returned successfully");
+}
+
+// ===== HELPER METHODS =====
+
+public List<EquipmentRequestResponse> getActiveRequests() {
+    return equipmentRequestRepository.findActiveRequests().stream()
+            .map(this::mapToResponse)
+            .collect(Collectors.toList());
+}
+
+public List<EquipmentRequestResponse> getExtensionRequests() {
+    return equipmentRequestRepository.findPendingExtensionRequests().stream()
+            .map(this::mapToResponse)
+            .collect(Collectors.toList());
+}
+
+private double getTotalExtensionHoursToday(Long userId) {
+    LocalDateTime startOfDay = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
+    LocalDateTime endOfDay = startOfDay.plusDays(1).minusNanos(1);
+    
+    return equipmentRequestRepository.getTotalExtensionHoursForUserToday(userId, startOfDay, endOfDay);
+}
+
+// Auto-complete returned requests
+@Transactional
+public void markReturnedRequestsAsCompleted() {
+    List<EquipmentRequest> returnedRequests = equipmentRequestRepository
+        .findByStatusAndReturnedAtIsNotNull(EquipmentRequest.RequestStatus.RETURNED);
+    
+    for (EquipmentRequest request : returnedRequests) {
+        request.setStatus(EquipmentRequest.RequestStatus.COMPLETED);
+        equipmentRequestRepository.save(request);
+    }
+}
+
+private void updateRequestStatusIfNeeded(EquipmentRequest request) {
+    LocalDateTime now = LocalDateTime.now();
+    
+    // Auto-update APPROVED to IN_USE when start time reached
+    if (request.getStatus() == EquipmentRequest.RequestStatus.APPROVED && 
+        request.getStartTime().isBefore(now)) {
+        request.setStatus(EquipmentRequest.RequestStatus.IN_USE);
+        equipmentRequestRepository.save(request);
+    }
+    
+    // Mark as late return if overdue
+    if (request.getStatus() == EquipmentRequest.RequestStatus.IN_USE && 
+        request.getEndTime().isBefore(now) && 
+        request.getReturnedAt() == null && 
+        (request.getIsLateReturn() == null || !request.getIsLateReturn())) {
+        request.setIsLateReturn(true);
+        equipmentRequestRepository.save(request);
+    }
+}
+
+
 }

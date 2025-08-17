@@ -16,6 +16,7 @@ import com.auca.library.model.RecurringBookingSeries;
 import com.auca.library.model.Room;
 import com.auca.library.model.RoomBooking;
 import com.auca.library.model.User;
+import com.auca.library.model.Location;
 
 @Repository
 public interface RoomBookingRepository extends JpaRepository<RoomBooking, Long> {
@@ -324,4 +325,28 @@ List<RoomBooking> findBookingsInPeriod(@Param("room") Room room,
 @Query("SELECT rb FROM RoomBooking rb WHERE rb.startTime >= :startTime AND rb.startTime <= :endTime ORDER BY rb.startTime")
 List<RoomBooking> findBookingsInPeriod(@Param("startTime") LocalDateTime startTime, 
                                       @Param("endTime") LocalDateTime endTime);
+
+
+       @Query("SELECT rb FROM RoomBooking rb WHERE rb.room.location = :location AND " +
+           "rb.startTime >= :startTime AND rb.endTime <= :endTime")
+    List<RoomBooking> findByRoomLocationAndTimeRange(@Param("location") Location location,
+                                                    @Param("startTime") LocalDateTime startTime,
+                                                    @Param("endTime") LocalDateTime endTime);
+    
+    @Query("SELECT COUNT(rb) FROM RoomBooking rb WHERE rb.room.location = :location AND " +
+           "rb.startTime <= :currentTime AND rb.endTime >= :currentTime AND " +
+           "(rb.status = 'CONFIRMED' OR rb.status = 'CHECKED_IN')")
+    int countActiveBookingsByLocation(@Param("location") Location location, 
+                                     @Param("currentTime") LocalDateTime currentTime);
+    
+    @Query("SELECT COUNT(rb) FROM RoomBooking rb WHERE " +
+           "rb.startTime <= :currentTime AND rb.endTime >= :currentTime AND " +
+           "(rb.status = 'CONFIRMED' OR rb.status = 'CHECKED_IN')")
+    int countActiveBookings(@Param("currentTime") LocalDateTime currentTime);
+    
+    @Query("SELECT rb FROM RoomBooking rb WHERE rb.user = :user AND " +
+           "rb.startTime >= :startTime AND rb.endTime <= :endTime")
+    List<RoomBooking> findByUserAndTimeRange(@Param("user") User user,
+                                            @Param("startTime") LocalDateTime startTime,
+                                            @Param("endTime") LocalDateTime endTime);                               
 }

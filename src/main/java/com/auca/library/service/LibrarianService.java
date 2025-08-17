@@ -35,124 +35,157 @@ public class LibrarianService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    // Get all librarians (Admin view)
+    // Get all librarians (Admin view) - FIXED IMPLEMENTATION
     public List<LibrarianResponse> getAllLibrarians() {
-        List<User> librarians = userRepository.findByRole(Role.ERole.ROLE_LIBRARIAN);
-        return librarians.stream()
-                .map(this::mapToLibrarianResponse)
-                .collect(Collectors.toList());
+        try {
+            // Find all users with LIBRARIAN role
+            List<User> librarians = userRepository.findAllLibrarians(); // Make sure this method exists
+            return librarians.stream()
+                    .map(this::mapToLibrarianResponse)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to fetch librarians: " + e.getMessage());
+        }
     }
 
     // Get librarians by location (Admin/Librarian view)
     public List<LibrarianResponse> getLibrariansByLocation(Location location) {
-        List<User> librarians = userRepository.findLibrariansByLocation(location);
-        return librarians.stream()
-                .map(this::mapToLibrarianResponse)
-                .collect(Collectors.toList());
+        try {
+            List<User> librarians = userRepository.findLibrariansByLocation(location);
+            return librarians.stream()
+                    .map(this::mapToLibrarianResponse)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to fetch librarians by location: " + e.getMessage());
+        }
     }
 
     // Get active librarians for today (Public view)
     public List<PublicLibrarianResponse> getActiveLibrariansToday(Location location) {
-        DayOfWeek today = LocalDate.now().getDayOfWeek();
-        List<User> activeLibrarians = userRepository.findActiveLibrariansForDay(today, location);
-        
-        if (activeLibrarians.isEmpty()) {
-            // Return default librarian if no active librarians
-            return userRepository.findDefaultLibrarianByLocation(location)
-                    .map(user -> List.of(mapToPublicResponse(user)))
-                    .orElse(List.of());
+        try {
+            DayOfWeek today = LocalDate.now().getDayOfWeek();
+            List<User> activeLibrarians = userRepository.findActiveLibrariansForDay(today, location);
+            
+            if (activeLibrarians.isEmpty()) {
+                // Return default librarian if no active librarians
+                return userRepository.findDefaultLibrarianByLocation(location)
+                        .map(user -> List.of(mapToPublicResponse(user)))
+                        .orElse(List.of());
+            }
+            
+            return activeLibrarians.stream()
+                    .map(this::mapToPublicResponse)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to fetch active librarians: " + e.getMessage());
         }
-        
-        return activeLibrarians.stream()
-                .map(this::mapToPublicResponse)
-                .collect(Collectors.toList());
     }
 
     // Get librarians scheduled for a specific day
     public List<LibrarianResponse> getLibrariansForDay(DayOfWeek dayOfWeek, Location location) {
-        List<User> librarians = userRepository.findLibrariansByDayAndLocation(dayOfWeek, location);
-        return librarians.stream()
-                .map(this::mapToLibrarianResponse)
-                .collect(Collectors.toList());
+        try {
+            List<User> librarians = userRepository.findLibrariansByDayAndLocation(dayOfWeek, location);
+            return librarians.stream()
+                    .map(this::mapToLibrarianResponse)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to fetch librarians for day: " + e.getMessage());
+        }
     }
 
     // Create new librarian user (Admin only)
     @Transactional
     public LibrarianResponse createLibrarian(CreateLibrarianRequest request) {
-        // Validate working days capacity
-        validateWorkingDaysCapacity(request.getWorkingDays(), request.getLocation(), null, request.isActiveThisWeek());
-        
-        // Handle default librarian logic
-        if (request.isDefaultLibrarian()) {
-            clearExistingDefaultLibrarian(request.getLocation());
+        try {
+            // Validate working days capacity
+            validateWorkingDaysCapacity(request.getWorkingDays(), request.getLocation(), null, request.isActiveThisWeek());
+            
+            // Handle default librarian logic
+            if (request.isDefaultLibrarian()) {
+                clearExistingDefaultLibrarian(request.getLocation());
+            }
+
+            // Create new user
+            User user = new User();
+            user.setFullName(request.getFullName());
+            user.setEmail(request.getEmail());
+            user.setEmployeeId(request.getEmployeeId());
+            user.setPhone(request.getPhone());
+            user.setLocation(request.getLocation());
+            user.setPassword(passwordEncoder.encode("defaultPassword123")); // Should be changed on first login
+            user.setMustChangePassword(true);
+            user.setEmailVerified(true);
+            
+            // Set librarian role
+            Role librarianRole = roleRepository.findByName(Role.ERole.ROLE_LIBRARIAN)
+                    .orElseThrow(() -> new RuntimeException("Librarian role not found"));
+            user.getRoles().add(librarianRole);
+            
+            // Set librarian-specific fields
+            user.setWorkingDays(request.getWorkingDays());
+            user.setActiveThisWeek(request.isActiveThisWeek());
+            user.setDefaultLibrarian(request.isDefaultLibrarian());
+
+            User savedUser = userRepository.save(user);
+            return mapToLibrarianResponse(savedUser);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to create librarian: " + e.getMessage());
         }
-
-        // Create new user
-        User user = new User();
-        user.setFullName(request.getFullName());
-        user.setEmail(request.getEmail());
-        user.setEmployeeId(request.getEmployeeId());
-        user.setPhone(request.getPhone());
-        user.setLocation(request.getLocation());
-        user.setPassword(passwordEncoder.encode("defaultPassword123")); // Should be changed on first login
-        user.setMustChangePassword(true);
-        user.setEmailVerified(true);
-        
-        // Set librarian role
-        Role librarianRole = roleRepository.findByName(Role.ERole.ROLE_LIBRARIAN)
-                .orElseThrow(() -> new RuntimeException("Librarian role not found"));
-        user.getRoles().add(librarianRole);
-        
-        // Set librarian-specific fields
-        user.setWorkingDays(request.getWorkingDays());
-        user.setActiveThisWeek(request.isActiveThisWeek());
-        user.setDefaultLibrarian(request.isDefaultLibrarian());
-
-        User savedUser = userRepository.save(user);
-        return mapToLibrarianResponse(savedUser);
     }
 
     // Update librarian schedule (Admin/Librarian)
     @Transactional
     public LibrarianResponse updateLibrarianSchedule(LibrarianRequest request) {
-        User librarian = findLibrarianById(request.getUserId());
-        
-        // Validate working days capacity
-        validateWorkingDaysCapacity(request.getWorkingDays(), request.getLocation(), 
-                                   librarian.getId(), request.isActiveThisWeek());
-        
-        // Handle default librarian logic
-        if (request.isDefaultLibrarian() && !librarian.isDefaultLibrarian()) {
-            clearExistingDefaultLibrarian(request.getLocation());
+        try {
+            User librarian = findLibrarianById(request.getUserId());
+            
+            // Validate working days capacity
+            validateWorkingDaysCapacity(request.getWorkingDays(), request.getLocation(), 
+                                       librarian.getId(), request.isActiveThisWeek());
+            
+            // Handle default librarian logic
+            if (request.isDefaultLibrarian() && !librarian.isDefaultLibrarian()) {
+                clearExistingDefaultLibrarian(request.getLocation());
+            }
+
+            // Update librarian fields
+            librarian.setWorkingDays(request.getWorkingDays());
+            librarian.setActiveThisWeek(request.isActiveThisWeek());
+            librarian.setDefaultLibrarian(request.isDefaultLibrarian());
+            librarian.setLocation(request.getLocation());
+
+            User savedUser = userRepository.save(librarian);
+            return mapToLibrarianResponse(savedUser);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to update librarian schedule: " + e.getMessage());
         }
-
-        // Update librarian fields
-        librarian.setWorkingDays(request.getWorkingDays());
-        librarian.setActiveThisWeek(request.isActiveThisWeek());
-        librarian.setDefaultLibrarian(request.isDefaultLibrarian());
-        librarian.setLocation(request.getLocation());
-
-        User savedUser = userRepository.save(librarian);
-        return mapToLibrarianResponse(savedUser);
     }
 
     // Toggle librarian active status (Librarian self-service)
     @Transactional
     public MessageResponse toggleLibrarianActiveStatus(Long librarianId) {
-        User librarian = findLibrarianById(librarianId);
-        librarian.setActiveThisWeek(!librarian.isActiveThisWeek());
-        userRepository.save(librarian);
-        
-        String status = librarian.isActiveThisWeek() ? "active" : "inactive";
-        return new MessageResponse("Librarian status updated to " + status);
+        try {
+            User librarian = findLibrarianById(librarianId);
+            librarian.setActiveThisWeek(!librarian.isActiveThisWeek());
+            userRepository.save(librarian);
+            
+            String status = librarian.isActiveThisWeek() ? "active" : "inactive";
+            return new MessageResponse("Librarian status updated to " + status);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to toggle librarian status: " + e.getMessage());
+        }
     }
 
     // Get weekly schedule overview
     public List<LibrarianResponse> getWeeklySchedule(Location location) {
-        List<User> librarians = userRepository.findLibrariansByLocation(location);
-        return librarians.stream()
-                .map(this::mapToLibrarianResponse)
-                .collect(Collectors.toList());
+        try {
+            List<User> librarians = userRepository.findLibrariansByLocation(location);
+            return librarians.stream()
+                    .map(this::mapToLibrarianResponse)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to fetch weekly schedule: " + e.getMessage());
+        }
     }
 
     // Private helper methods
@@ -167,7 +200,8 @@ public class LibrarianService {
             if (excludeUserId != null) {
                 User existingLibrarian = userRepository.findById(excludeUserId).orElse(null);
                 if (existingLibrarian != null && existingLibrarian.isActiveThisWeek() && 
-                    existingLibrarian.worksOnDay(day)) {
+                    existingLibrarian.getWorkingDays() != null && 
+                    existingLibrarian.getWorkingDays().contains(day)) {
                     activeCount--;
                 }
             }
@@ -180,11 +214,10 @@ public class LibrarianService {
     }
 
     private void clearExistingDefaultLibrarian(Location location) {
-        List<User> existingDefaults = userRepository.findDefaultLibrariansByLocation(location);
-        for (User existing : existingDefaults) {
+        userRepository.findDefaultLibrarianByLocation(location).ifPresent(existing -> {
             existing.setDefaultLibrarian(false);
             userRepository.save(existing);
-        }
+        });
     }
 
     private User findLibrarianById(Long id) {

@@ -8,21 +8,26 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.auca.library.dto.request.RoomBookingRequest;
 import com.auca.library.exception.BookingConflictException;
 import com.auca.library.exception.BookingLimitExceededException;
+import com.auca.library.model.Role;
 import com.auca.library.model.Room;
 import com.auca.library.model.RoomBooking;
-import com.auca.library.model.User;
 import com.auca.library.model.Seat;
+import com.auca.library.model.User;
 import com.auca.library.repository.RecurringBookingSeriesRepository;
 import com.auca.library.repository.RoomBookingRepository;
 
 @Service
 public class BookingValidationService {
+
+
+    private static final int ADMIN_WEEKLY_LIMIT = 999;  
+    private static final int PROFESSOR_WEEKLY_LIMIT = 30;
+    private static final int STUDENT_WEEKLY_LIMIT = 20;
     
     @Autowired private RoomBookingRepository roomBookingRepository;
     @Autowired private LibraryScheduleService libraryScheduleService;
@@ -127,20 +132,20 @@ public class BookingValidationService {
         }
     }
     
-    // NEW: Role-based weekly limits
+    // Role-based weekly limits
     private int getWeeklyLimitForUser(User user) {
         // Admin and Librarian - unlimited (or very high limit)
         if (user.hasRole(Role.ERole.ROLE_ADMIN) || user.hasRole(Role.ERole.ROLE_LIBRARIAN)) {
-            return adminWeeklyLimit; // 999 hours (effectively unlimited)
+            return ADMIN_WEEKLY_LIMIT; // 999 hours (effectively unlimited)
         }
         
         // Professor - higher limit
         if (user.hasRole(Role.ERole.ROLE_PROFESSOR) || user.hasRole(Role.ERole.ROLE_HOD)) {
-            return professorWeeklyLimit; // 30 hours per week
+            return PROFESSOR_WEEKLY_LIMIT; // 30 hours per week
         }
         
         // Students - standard limit
-        return studentWeeklyLimit; // 20 hours per week
+        return STUDENT_WEEKLY_LIMIT; // 20 hours per week
     }
     
     private void validateRoomCapacity(RoomBookingRequest request, Room room) {

@@ -46,13 +46,17 @@ public class Room {
     @Column(nullable = false)
     private boolean available = true;
 
+    // Room location - NEW FIELD ADDED
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Location location = Location.GISHUSHU; // Default to GISHUSHU
+
     // Room location details
     private String building;
     private String floor;
     private String department;
 
-
-     //QR CODE fields
+    //QR CODE fields
     @Column(name = "qr_code_url")
     private String qrCodeUrl;
 
@@ -98,6 +102,17 @@ public class Room {
         this.category = category;
         this.capacity = capacity;
         this.maxBookingHours = maxBookingHours;
+        this.location = Location.GISHUSHU; // Set default location in constructor
+    }
+
+    // Additional constructor with location
+    public Room(String roomNumber, String name, RoomCategory category, Integer capacity, Integer maxBookingHours, Location location) {
+        this.roomNumber = roomNumber;
+        this.name = name;
+        this.category = category;
+        this.capacity = capacity;
+        this.maxBookingHours = maxBookingHours;
+        this.location = location != null ? location : Location.GISHUSHU;
     }
 
     @PreUpdate
@@ -128,5 +143,10 @@ public class Room {
         }
         LocalDateTime now = LocalDateTime.now();
         return now.isAfter(maintenanceStart) && now.isBefore(maintenanceEnd);
+    }
+
+    // Helper method for location
+    public boolean isAtLocation(Location location) {
+        return this.location == location;
     }
 }

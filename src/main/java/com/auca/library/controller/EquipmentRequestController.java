@@ -1,8 +1,6 @@
 package com.auca.library.controller;
 
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -20,8 +18,6 @@ import com.auca.library.dto.request.EquipmentRequestApprovalRequest;
 import com.auca.library.dto.request.EquipmentRequestRequest;
 import com.auca.library.dto.response.EquipmentRequestResponse;
 import com.auca.library.dto.response.MessageResponse;
-import com.auca.library.model.User;
-import com.auca.library.repository.UserRepository;
 import com.auca.library.service.EquipmentRequestService;
 
 import jakarta.validation.Valid;
@@ -33,9 +29,6 @@ public class EquipmentRequestController {
 
     @Autowired
     private EquipmentRequestService equipmentRequestService;
-
-    @Autowired
-    private UserRepository userRepository;
 
     // Create equipment request (Professor/Student)
     @PostMapping
@@ -114,37 +107,6 @@ public class EquipmentRequestController {
     }
 
 
-// @GetMapping("/debug/user/{email}")
-// @PreAuthorize("hasRole('ADMIN')")
-// public ResponseEntity<?> debugUserByEmail(@PathVariable String email) {
-//     List<User> users = userRepository.findAllByEmail(email);
-//     return ResponseEntity.ok(Map.of(
-//         "email", email,
-//         "userCount", users.size(),
-//         "users", users.stream().map(u -> Map.of(
-//             "id", u.getId(),
-//             "email", u.getEmail(),
-//             "fullName", u.getFullName(),
-//             "studentId", u.getStudentId(),
-//             "employeeId", u.getEmployeeId(),
-//             "roles", u.getRoles().stream().map(r -> r.getName().name()).collect(Collectors.toList())
-//         )).collect(Collectors.toList())
-//     ));
-// }
-
-// @GetMapping("/debug/duplicate-emails")
-// @PreAuthorize("hasRole('ADMIN')")
-// public ResponseEntity<?> findDuplicateEmails() {
-//     List<Object[]> duplicates = userRepository.findDuplicateEmails();
-//     return ResponseEntity.ok(duplicates.stream()
-//         .map(row -> Map.of(
-//             "email", row[0],
-//             "count", row[1]
-//         ))
-//         .collect(Collectors.toList()));
-// }
-
-
 // Cancel request
 @PostMapping("/{requestId}/cancel")
 @PreAuthorize("hasRole('PROFESSOR') or hasRole('USER')")
@@ -167,6 +129,71 @@ public ResponseEntity<EquipmentRequestResponse> getRequestById(@PathVariable Lon
 public ResponseEntity<MessageResponse> completeRequest(@PathVariable Long requestId, Authentication authentication) {
     equipmentRequestService.completeRequest(requestId);
     return ResponseEntity.ok(new MessageResponse("Request completed successfully"));
+}
+
+
+// Respond to admin suggestion (Professor)
+@PostMapping("/{requestId}/respond-suggestion")
+@PreAuthorize("hasRole('PROFESSOR')")
+public ResponseEntity<MessageResponse> respondToSuggestion(
+        @PathVariable Long requestId,
+        @Valid @RequestBody EquipmentRequestRequest request,
+        Authentication authentication) {
+    MessageResponse response = equipmentRequestService.respondToSuggestion(
+        requestId, request, authentication.getName());
+    return ResponseEntity.ok(response);
+}
+
+// Request extension (Professor)
+@PostMapping("/{requestId}/request-extension")
+@PreAuthorize("hasRole('PROFESSOR')")
+public ResponseEntity<MessageResponse> requestExtension(
+        @PathVariable Long requestId,
+        @Valid @RequestBody EquipmentRequestRequest request,
+        Authentication authentication) {
+    MessageResponse response = equipmentRequestService.requestExtension(
+        requestId, request, authentication.getName());
+    return ResponseEntity.ok(response);
+}
+
+// Mark equipment as returned (Equipment Admin)
+@PostMapping("/{requestId}/mark-returned")
+@PreAuthorize("hasRole('EQUIPMENT_ADMIN')")
+public ResponseEntity<MessageResponse> markEquipmentReturned(
+        @PathVariable Long requestId,
+        @Valid @RequestBody EquipmentRequestRequest request,
+        Authentication authentication) {
+    MessageResponse response = equipmentRequestService.markEquipmentReturned(
+        requestId, request, authentication.getName());
+    return ResponseEntity.ok(response);
+}
+
+// Handle extension requests (Equipment Admin)
+@PostMapping("/{requestId}/handle-extension")
+@PreAuthorize("hasRole('EQUIPMENT_ADMIN')")
+public ResponseEntity<MessageResponse> handleExtensionRequest(
+        @PathVariable Long requestId,
+        @Valid @RequestBody EquipmentRequestRequest request,
+        Authentication authentication) {
+    MessageResponse response = equipmentRequestService.handleExtensionRequest(
+        requestId, request, authentication.getName());
+    return ResponseEntity.ok(response);
+}
+
+// Get active/in-use requests (Equipment Admin)
+@GetMapping("/active")
+@PreAuthorize("hasRole('EQUIPMENT_ADMIN')")
+public ResponseEntity<List<EquipmentRequestResponse>> getActiveRequests() {
+    List<EquipmentRequestResponse> requests = equipmentRequestService.getActiveRequests();
+    return ResponseEntity.ok(requests);
+}
+
+// Get extension requests (Equipment Admin)
+@GetMapping("/extension-requests")
+@PreAuthorize("hasRole('EQUIPMENT_ADMIN')")
+public ResponseEntity<List<EquipmentRequestResponse>> getExtensionRequests() {
+    List<EquipmentRequestResponse> requests = equipmentRequestService.getExtensionRequests();
+    return ResponseEntity.ok(requests);
 }
 
 }

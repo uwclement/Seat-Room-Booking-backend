@@ -144,5 +144,29 @@ List<Booking> findTodaysActiveBookingsByLocation(
     @Param("statuses") List<Booking.BookingStatus> statuses
 );
 
+
+ @Query("SELECT b FROM Booking b WHERE b.seat.location = :location AND " +
+           "b.startTime >= :startTime AND b.endTime <= :endTime")
+    List<Booking> findBySeatLocationAndTimeRange(@Param("location") Location location, 
+                                                @Param("startTime") LocalDateTime startTime, 
+                                                @Param("endTime") LocalDateTime endTime);
+    
+    @Query("SELECT b FROM Booking b WHERE b.startTime >= :startTime AND b.endTime <= :endTime")
+    List<Booking> findByTimeRange(@Param("startTime") LocalDateTime startTime, 
+                                 @Param("endTime") LocalDateTime endTime);
+    
+    @Query("SELECT b FROM Booking b WHERE b.seat.id = :seatId AND " +
+           "((b.startTime <= :endTime AND b.endTime >= :startTime)) AND " +
+           "(b.status = 'RESERVED' OR b.status = 'CHECKED_IN')")
+    List<Booking> findActiveBySeatAndTime(@Param("seatId") Long seatId,
+                                         @Param("startTime") LocalDateTime startTime,
+                                         @Param("endTime") LocalDateTime endTime);
+    
+    @Query("SELECT b FROM Booking b WHERE b.user = :user AND " +
+           "b.startTime >= :startTime AND b.endTime <= :endTime")
+    List<Booking> findByUserAndTimeRange(@Param("user") User user,
+                                        @Param("startTime") LocalDateTime startTime,
+                                        @Param("endTime") LocalDateTime endTime);
+
 }
 

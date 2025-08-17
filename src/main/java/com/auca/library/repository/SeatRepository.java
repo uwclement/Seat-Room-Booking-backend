@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.auca.library.model.Location;
@@ -60,4 +61,12 @@ public interface SeatRepository extends JpaRepository<Seat, Long> {
     List<Seat> findByLocationAndZoneTypeAndHasDesktop(Location location, String zoneType, boolean hasDesktop);
 
     boolean existsBySeatNumber(String seatNumber);
+
+
+    @Query("SELECT COUNT(s) FROM Seat s WHERE s.location = :location")
+    long countByLocation(@Param("location") Location location);
+    
+    List<Seat> findByLocationAndIsDisabledFalse(Location location);
+    
+    List<Seat> findByLocationAndIsDisabledTrue(Location location);
 }
