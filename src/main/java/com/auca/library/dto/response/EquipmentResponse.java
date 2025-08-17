@@ -1,21 +1,31 @@
 package com.auca.library.dto.response;
 
-import lombok.Data;
+import java.util.List;
 
-@Data
+import com.auca.library.model.Location;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
 public class EquipmentResponse {
     private Long id;
     private String name;
     private String description;
     private boolean available;
-
     private boolean allowedToStudents;
     private Integer quantity;
     private Integer availableQuantity;
-    private Integer reservedQuantity; // Calculated field
+    private Location location;
+    private String locationDisplayName;
     
-    // Usage statistics
-    private int totalRooms; 
-    private int totalLabClasses; 
-    private boolean hasActiveRequests; 
+    // NEW: Inventory breakdown by status
+    private List<EquipmentInventoryResponse> inventoryBreakdown;
+    private Integer totalQuantity;
+    private Integer actualAvailableQuantity;
+    
+    public String getLocationDisplayName() {
+        return location != null ? location.getDisplayName() : "";
+    }
 }

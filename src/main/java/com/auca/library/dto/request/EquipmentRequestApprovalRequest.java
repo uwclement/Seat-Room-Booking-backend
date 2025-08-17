@@ -9,4 +9,6 @@ public class EquipmentRequestApprovalRequest {
     private boolean approved;
     private String rejectionReason;
     private String adminSuggestion;
+
+    private Long selectedEquipmentUnitId;
 }

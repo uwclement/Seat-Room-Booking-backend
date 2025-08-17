@@ -7,6 +7,8 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.hibernate.annotations.CreationTimestamp;
+
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
@@ -45,6 +47,10 @@ public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @CreationTimestamp
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
 
     // Common fields for all users
     @NotBlank
@@ -107,7 +113,7 @@ public class User {
     private boolean activeThisWeek = false;   
     private boolean activeToday = false;
     @Column(name = "is_default_librarian")
-    private boolean isDefaultLibrarian = false;
+    private boolean DefaultLibrarian = false;
 
 
     // Professor based fields

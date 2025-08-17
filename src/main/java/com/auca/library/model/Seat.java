@@ -38,6 +38,14 @@ public class Seat {
     @Column(nullable = false, length = 20)
     private Location location;
 
+    public Location getLocation() {
+    return location;
+    }
+
+    public void setLocation(Location location) {
+    this.location = location;
+    }
+
     // Zone type: collaboration or silent
     @Column(nullable = false)
     private String zoneType;
@@ -101,8 +109,4 @@ public class Seat {
         return seatNumber;
     }
 
-     public Location getLocation() {
-        return location;
-    }
-    
 }

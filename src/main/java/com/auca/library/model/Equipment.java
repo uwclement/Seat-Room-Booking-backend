@@ -5,6 +5,8 @@ import java.util.Set;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -36,22 +38,26 @@ public class Equipment {
     @Column(nullable = false)
     private boolean allowedToStudents = false;
 
+    // Keep for backward compatibility and simple queries
     private Integer quantity;
-
     private Integer availableQuantity;
 
+    // Location field
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Location location;
 
     @ManyToMany(mappedBy = "equipment")
     private Set<Room> rooms = new HashSet<>();
 
-    // Lab classes that have this equipment
     @ManyToMany(mappedBy = "equipment")
     private Set<LabClass> labClasses = new HashSet<>();
 
-    public Equipment(String name, String description) {
+    public Equipment(String name, String description, Location location) {
         this.name = name;
         this.description = description;
-        this.quantity = 1; // efault quantity
+        this.location = location;
+        this.quantity = 1;
         this.availableQuantity = 1;
     }
 
