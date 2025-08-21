@@ -29,7 +29,7 @@ public class EmailService {
         helper.setTo(to);
         helper.setSubject("Verify your AUCA Library Account");
         
-        String verificationUrl = "http://192.168.1.68:3000/verify?token=" + token;
+        String verificationUrl = "http://localhost:3000/verify?token=" + token;
         
         String content = "<html><body>"
                 + "<h2>AUCA Library Account Verification</h2>"
@@ -77,7 +77,7 @@ public class EmailService {
         helper.setTo(to);
         helper.setSubject("Your AUCA Library Booking is Ending Soon");
         
-        String confirmUrl = "http://http://192.168.1.68:3000/bookings";
+        String confirmUrl = "http://http://localhost:3000/bookings";
 
         
         String content = "<html><body>"
