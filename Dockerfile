@@ -1,6 +1,9 @@
 # Use official JDK 21
 FROM eclipse-temurin:21-jdk-alpine
 
+# Install bash and git (needed for Maven wrapper sometimes)
+RUN apk add --no-cache bash git
+
 # Set working directory
 WORKDIR /app
 
@@ -9,14 +12,14 @@ COPY mvnw .
 COPY pom.xml .
 COPY .mvn .mvn
 
+# Copy the source code BEFORE running build
+COPY src ./src
+
 # Make Maven wrapper executable
 RUN chmod +x mvnw
 
-# Build the project (skip tests for faster build)
+# Build the project (skip tests)
 RUN ./mvnw clean package -DskipTests
-
-# Copy source code
-COPY src ./src
 
 # Set Railway port
 ENV PORT=8080
