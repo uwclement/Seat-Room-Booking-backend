@@ -1,25 +1,26 @@
-# Use official OpenJDK image
+# Use official JDK 21
 FROM eclipse-temurin:21-jdk-alpine
 
-# Set working directory inside container
+# Set working directory
 WORKDIR /app
 
-# Copy Maven/Gradle wrapper and pom.xml first (for caching)
+# Copy Maven wrapper and pom.xml first (for caching)
 COPY mvnw .
 COPY pom.xml .
 COPY .mvn .mvn
 
-# Install dependencies and build the project
+# Make Maven wrapper executable
+RUN chmod +x mvnw
+
+# Build the project (skip tests for faster build)
 RUN ./mvnw clean package -DskipTests
 
-# Copy the source code
+# Copy source code
 COPY src ./src
 
-# Set environment variable for Railway port
+# Set Railway port
 ENV PORT=8080
-
-# Expose the port
 EXPOSE 8080
 
-# Run the Spring Boot application
-CMD ["java", "-jar", "target/your-app.jar"]
+# Run Spring Boot app
+CMD ["java", "-jar", "target/library-booking-0.0.1-SNAPSHOT.jar"]
