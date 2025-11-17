@@ -413,6 +413,106 @@ public class BookingService {
     }
 
 
+    @Transactional
+public BookingDTO updateBooking(Long bookingId, CreateBookingRequest request) throws MessagingException {
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    String currentUserEmail = authentication.getName();
+
+    User user = userRepository.findByEmail(currentUserEmail)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + currentUserEmail));
+
+    Booking booking = bookingRepository.findById(bookingId)
+            .orElseThrow(() -> new ResourceNotFoundException("Booking not found with id: " + bookingId));
+
+    // Validate user owns the booking
+    if (!booking.getUser().getId().equals(user.getId())) {
+        throw new BadRequestException("You don't have permission to update this booking");
+    }
+
+    // Check if booking can be edited (only RESERVED status)
+    if (booking.getStatus() != Booking.BookingStatus.RESERVED) {
+        throw new BadRequestException("Only reserved bookings can be edited");
+    }
+
+    // Check if update is allowed (before 10 minutes of start time)
+    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime tenMinutesBeforeStart = booking.getStartTime().minusMinutes(10);
+    
+    if (now.isAfter(tenMinutesBeforeStart)) {
+        throw new BadRequestException("Bookings cannot be edited within 10 minutes of start time");
+    }
+
+    // Get new seat if changed
+    Seat newSeat = booking.getSeat(); // Default to current seat
+    if (!request.getSeatId().equals(booking.getSeat().getId())) {
+        newSeat = seatRepository.findById(request.getSeatId())
+                .orElseThrow(() -> new ResourceNotFoundException("Seat not found with id: " + request.getSeatId()));
+        
+        if (newSeat.isDisabled()) {
+            throw new BadRequestException("The selected seat is currently unavailable");
+        }
+    }
+
+    // Store original booking details for rollback in case of conflicts
+    LocalDateTime originalStartTime = booking.getStartTime();
+    LocalDateTime originalEndTime = booking.getEndTime();
+    Seat originalSeat = booking.getSeat();
+
+    // Validate new booking time constraints
+    validateBookingTime(request.getStartTime(), request.getEndTime(), user.getId(), newSeat);
+
+    // Check if new time/seat combination is available (excluding current booking)
+    if (!isSeatAvailableForUpdate(newSeat.getId(), request.getStartTime(), request.getEndTime(), bookingId)) {
+        throw new BadRequestException("The seat is not available for the requested time period");
+    }
+
+    // Update booking details
+    booking.setSeat(newSeat);
+    booking.setStartTime(request.getStartTime());
+    booking.setEndTime(request.getEndTime());
+    booking.setNotes(request.getNotes());
+    // booking.setUpdatedAt(LocalDateTime.now());
+
+    booking = bookingRepository.save(booking);
+
+    // Handle wait list notifications for the original slot
+    notifyWaitListUsers(originalSeat.getId(), originalStartTime, originalEndTime);
+
+    // Update wait list for new slot if seat/time changed
+    if (!originalSeat.getId().equals(newSeat.getId()) || 
+        !originalStartTime.equals(request.getStartTime()) || 
+        !originalEndTime.equals(request.getEndTime())) {
+        
+        updateWaitListForBookingChange(newSeat.getId(), request.getStartTime(), request.getEndTime());
+    }
+
+    return mapBookingToDTO(booking);
+}
+
+// Helper method to check seat availability excluding current booking
+private boolean isSeatAvailableForUpdate(Long seatId, LocalDateTime startTime, LocalDateTime endTime, Long excludeBookingId) {
+    List<Booking> overlappingBookings = bookingRepository.findOverlappingBookings(seatId, startTime, endTime);
+    
+    // Remove the current booking from the list since we're updating it
+    overlappingBookings.removeIf(booking -> booking.getId().equals(excludeBookingId));
+    
+    return overlappingBookings.isEmpty();
+}
+
+// Helper method to update wait list when booking changes
+private void updateWaitListForBookingChange(Long seatId, LocalDateTime startTime, LocalDateTime endTime) {
+    List<WaitList> waitingUsers = waitListRepository.findWaitingListForSeat(seatId);
+    for (WaitList waitItem : waitingUsers) {
+        if (isTimeOverlapping(waitItem.getRequestedStartTime(), waitItem.getRequestedEndTime(),
+                startTime, endTime)) {
+            // Mark as fulfilled since seat is now booked for this time
+            waitItem.setStatus(WaitList.WaitListStatus.FULFILLED);
+            waitListRepository.save(waitItem);
+        }
+    }
+}
+
+
     //extend based notification 
 
     @Scheduled(fixedRate = 300000) // Run every 5 minutes
