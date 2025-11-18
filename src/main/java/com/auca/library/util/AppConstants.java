@@ -13,7 +13,7 @@ public class AppConstants {
     
     // Email constants
     public static final String EMAIL_VERIFICATION_SUBJECT = "Verify your AUCA Library Account";
-    public static final String EMAIL_VERIFICATION_BASE_URL = "http://localhost:8080/api/auth/verify?token=";
+    public static final String EMAIL_VERIFICATION_BASE_URL = "http://aucabooking.up.railway.app/api/auth/verify?token=";
     public static final long EMAIL_VERIFICATION_EXPIRATION_HOURS = 24;
     
     // Reservation constants
