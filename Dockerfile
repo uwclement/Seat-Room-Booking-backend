@@ -1,29 +1,35 @@
-# Use official JDK 21
-FROM eclipse-temurin:21-jdk-alpine
+# Stage 1: Build
+FROM eclipse-temurin:21-jdk-alpine AS build
 
-# Install bash and git (needed for Maven wrapper sometimes)
-RUN apk add --no-cache bash git
-
-# Set working directory
 WORKDIR /app
 
-# Copy Maven wrapper and pom.xml first (for caching)
+# Copy Maven wrapper and pom.xml
 COPY mvnw .
-COPY pom.xml .
 COPY .mvn .mvn
+COPY pom.xml .
 
-# Copy the source code BEFORE running build
-COPY src ./src
-
-# Make Maven wrapper executable
+# Make mvnw executable
 RUN chmod +x mvnw
 
-# Build the project (skip tests)
+# Download dependencies
+RUN ./mvnw dependency:go-offline
+
+# Copy source code
+COPY src ./src
+
+# Build the project
 RUN ./mvnw clean package -DskipTests
 
-# Set Railway port
-ENV PORT=8080
+# Stage 2: Run
+FROM eclipse-temurin:21-jdk-alpine
+
+WORKDIR /app
+
+# Copy the jar from build stage
+COPY --from=build /app/target/library-booking-0.0.1-SNAPSHOT.jar app.jar
+
+# Expose port (Railway will override with PORT)
 EXPOSE 8080
 
-# Run Spring Boot app
-CMD ["java", "-jar", "target/library-booking-0.0.1-SNAPSHOT.jar"]
+# Run the jar
+ENTRYPOINT ["java","-jar","app.jar"]
