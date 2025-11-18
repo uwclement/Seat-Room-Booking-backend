@@ -29,7 +29,7 @@ public class EmailService {
         helper.setTo(to);
         helper.setSubject("Verify your AUCA Library Account");
         
-        String verificationUrl = "http://aucabooking.vercel.app/verify?token=" + token;
+        String verificationUrl = "https://aucabooking.vercel.app/verify?token=" + token;
         
         String content = "<html><body>"
                 + "<h2>AUCA Library Account Verification</h2>"
@@ -77,7 +77,7 @@ public class EmailService {
         helper.setTo(to);
         helper.setSubject("Your AUCA Library Booking is Ending Soon");
         
-        String confirmUrl = "http://aucabooking.vercel.app/bookings";
+        String confirmUrl = "https://aucabooking.vercel.app/bookings";
 
         
         String content = "<html><body>"
@@ -105,7 +105,7 @@ public class EmailService {
         helper.setTo(to);
         helper.setSubject("Your Waitlisted AUCA Library Seat is Available");
         
-        String bookingUrl = "http://aucabooking.vercel.app/seats";
+        String bookingUrl = "https://aucabooking.vercel.app/seats";
         
         String content = "<html><body>"
                 + "<h2>AUCA Library Wait List Notification</h2>"
@@ -134,7 +134,7 @@ public void sendNoShowNotification(String to, String seatNumber, LocalDateTime s
     helper.setTo(to);
     helper.setSubject("AUCA Library Booking Cancelled - No Show");
     
-    String bookingUrl = "http://aucabooking.vercel.app/seats";
+    String bookingUrl = "https://aucabooking.vercel.app/seats";
     
     String content = "<html><body>"
             + "<h2>AUCA Library Booking Cancellation Notice</h2>"
