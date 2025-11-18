@@ -25,6 +25,7 @@ public class SignupRequest {
     private String studentId;
 
     @NotNull
+    
     private Location location;
 
     @NotBlank

@@ -26,5 +26,6 @@ public class EquipmentRequest {
     private Integer quantity;
     
     @NotNull
+    
     private Location location;
 }

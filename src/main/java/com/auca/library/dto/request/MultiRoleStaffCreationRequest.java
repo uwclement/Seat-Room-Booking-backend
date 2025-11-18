@@ -34,6 +34,7 @@ public class MultiRoleStaffCreationRequest {
     private String phone;
 
     @NotNull
+    
     private Location location;
 
     @NotEmpty
