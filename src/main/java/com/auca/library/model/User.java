@@ -78,8 +78,8 @@ public class User {
     private Set<Role> roles = new HashSet<>();
 
     // Authentication and verification fields
-    @Column(nullable = false)
-    private boolean emailVerified = false;
+    @Column(nullable = true)
+    private boolean emailVerified = true;
     
     private String verificationToken;
     

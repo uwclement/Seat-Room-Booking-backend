@@ -33,7 +33,7 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
 @Service
 public class QRCodeGenerationService {
 
-    @Value("${qr.base-url:http://aucabooking.vercel.app}")
+    @Value("${qr.base-url:https://aucabooking.vercel.app}")
     // @Value("${qr.base-url:http://10.24.229.246:3000}")
     private String baseUrl;
 
