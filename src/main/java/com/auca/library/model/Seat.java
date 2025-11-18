@@ -35,8 +35,9 @@ public class Seat {
 
     @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, columnDefinition = "location_enum")
     private Location location;
+
 
     public Location getLocation() {
     return location;
